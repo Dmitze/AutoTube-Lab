@@ -19,6 +19,19 @@ That document defines:
 - the rule to keep **ML / Backend / DevOps** responsibilities separate;
 - the need to account for **Hetzner / UA locality / local-first deployment** when discussing infrastructure.
 
+## Recommended (Refined) Agent Prompts (2026)
+Use these as the primary prompts for new Copilot/AI sessions:
+
+- [`docs/AI_AGENT_START_PROMPT_2026_REFINED.md`](docs/AI_AGENT_START_PROMPT_2026_REFINED.md)
+- [`docs/AI_AGENT_PROMPT_ML_REFINED.md`](docs/AI_AGENT_PROMPT_ML_REFINED.md)
+- [`docs/AI_AGENT_PROMPT_BACKEND_REFINED.md`](docs/AI_AGENT_PROMPT_BACKEND_REFINED.md)
+- [`docs/AI_AGENT_PROMPT_DEVOPS_REFINED.md`](docs/AI_AGENT_PROMPT_DEVOPS_REFINED.md)
+- [`docs/AI_AGENT_PROMPT_COMPLIANCE_REFINED.md`](docs/AI_AGENT_PROMPT_COMPLIANCE_REFINED.md)
+- [`docs/AI_AGENT_PROMPT_FRONTEND_REFINED.md`](docs/AI_AGENT_PROMPT_FRONTEND_REFINED.md)
+- [`docs/HOW_TO_START_A_NEW_TASK_CHAT.md`](docs/HOW_TO_START_A_NEW_TASK_CHAT.md)
+- [`docs/PROMPT_ACCEPTANCE_CRITERIA.md`](docs/PROMPT_ACCEPTANCE_CRITERIA.md)
+- [`docs/COMPLIANCE_CHECKLIST.md`](docs/COMPLIANCE_CHECKLIST.md)
+
 ## Existing Detailed Specs
 
 - [`docs/AI_AGENT_ML_IMPLEMENTATION_PROMPT.md`](docs/AI_AGENT_ML_IMPLEMENTATION_PROMPT.md)
