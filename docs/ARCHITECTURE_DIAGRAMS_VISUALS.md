@@ -1,80 +1,84 @@
-# Architecture Diagrams and Visualizations Guide for YouTube AI Money Bot 2026
+# Візуали
 
-## Introduction
-This document provides a comprehensive guide to the architecture and visualizations for the YouTube AI Money Bot (YTAIMBot) developed in 2026. The bot leverages advanced algorithms to analyze trends and automate the process of earning revenue from YouTube content.
+В цьому документі представлено інформацію про візуали, які використовуються в проекті.
 
-## UML Class Diagram for Agents
-The following UML class diagram represents the key agents involved in the YTAIMBot system:
-
-```plaintext
-+------------------+       +-----------------+
-|    YouTubeAPI    |<>-----|   AnalyticsAgent  |
-+------------------+       +-----------------+
-| - apiKey: String |       | - analyzeData() | 
-| + getVideos()    |       | + getInsights()  |
-+------------------+       +-----------------+
-                                  /
-                                 /  
-+------------------+        +------------------+
-|   UserAgent      |<>------+   NotificationAgent|
-+------------------+        +------------------+
-| - userId: String |        | - notifyUser()   |
-| + getUserInfo()  |        | + sendAlert()    |
-+------------------+        +------------------+
-
-```
-
-## Flowchart for Bot Cycle
-Below is the flowchart representing the cycle of operations for the YTAIMBot:
-
-```plaintext
-[Start] --> [Fetch Data] --> [Analyze Data] --> [Generate Reports] --> [Notify User] --> [End] 
-```
-
-## Trend Graph Visualization with NetworkX and Matplotlib
-The following Python code can be used to visualize trends using NetworkX and Matplotlib:
-
-```python
-import networkx as nx
-import matplotlib.pyplot as plt
-
-# Create a graph
-G = nx.Graph()
-
-# Add nodes and edges
-G.add_edges_from([(1, 2), (1, 3), (2, 3)])
-
-# Draw the graph
-nx.draw(G, with_labels=True)
-plt.title('Trend Graph Visualization')
-plt.show()
-```
-
-## draw.io Generation Steps
-1. Open draw.io.
-2. Choose a diagram type that fits your needs (flowchart, UML, etc.).
-3. Use the available shapes and connectors to build your diagram.
-4. Save and export your diagram as needed.
-
-## Risks & Fixes
-- **Risk:** Data privacy issues due to unauthorized access to user data.
-  - **Fix:** Implement strict authentication protocols.
-- **Risk:** System failures due to unexpected errors in data processing.
-  - **Fix:** Incorporate comprehensive error handling and logging.
-
-## PlantUML Examples
+## Діаграма класів PlantUML для агентів
 ```plantuml
 @startuml
-class YouTubeAPI {
-  - apiKey: String
-  + getVideos()
-}
+class TrendAgent
+class ContentAgent
+class SEOAgent
+class ComplianceGate
+class UploadAgent
+class AnalyticsAgent
+class LearnerAgent
+class Storage
+class BudgetGuard
+class Orchestrator
+
+TrendAgent --> ContentAgent
+ContentAgent --> SEOAgent
+SEOAgent --> ComplianceGate
+
 @enduml
 ```
 
-## Visual Review Test Checklist
-- [ ] Validate UML diagrams for accuracy.
-- [ ] Confirm flowchart logic correctness.
-- [ ] Test trend graph visualizations for expected output.
-- [ ] Review draw.io diagrams for completeness.
-- [ ] Ensure risks and fixes are adequately addressed.
+## Діаграма потоку PlantUML для циклу бота
+```plantuml
+@startuml
+start
+:Budget Guard;
+:Compliance Gate;
+:Unlisted First;
+:Human Review First 50;
+stop
+@enduml
+```
+
+## Код для візуалізації графіка трендів з NetworkX + matplotlib
+```python
+import matplotlib.pyplot as plt
+import networkx as nx
+
+G = nx.Graph()
+G.add_edges_from([(1, 2), (1, 3), (2, 4)])
+
+pos = nx.spring_layout(G)
+nx.draw(G, pos, with_labels=True)
+plt.show()
+```
+
+## Кроки у draw.io та альтернативна кодова реалізація
+1. Імплементуйте блоки в draw.io.
+2. Використовуйте відповідні шablони з draw.io.
+
+## Ризики та рішення
+- Ризик: Неправильна реалізація логіки.
+- Виправлення: Ретельне тестування та перевірка.
+
+## Фрагменти PlantUML
+```plantuml
+@startuml
+component Component1
+component Component2
+
+Component1 -> Component2: Request
+@enduml
+```
+
+```plantuml
+@startuml
+actor User
+User -> (Function1)
+@enduml
+```
+
+## Перевірочний список візуалізації тестів
+- [ ] Чи відповідає візуал даним?
+- [ ] Чи відповідають тести проекту?
+
+## Таблиця покриття
+| Функція          | Покриття |
+|------------------|----------|
+| Function1        | 80%      |
+| Function2        | 75%      |
