@@ -1,83 +1,75 @@
-# AI/ML Engineer Agent Prompt
+# AI Agent Spec (v2) — ML Implementation for “YouTube AI Money Bot 2026” (YTAIMBot)
+Role: Senior AI/ML Engineer (agentic systems + content generation)  
+Niche: **AI‑туторіали для розробників** (Python/JS/DevOps/LLM tools)  
+Owner: Lead Developer (Python/JS)  
+Primary objective: Build ML modules that make the bot **autonomous, adaptive, and profitable** with a target of **$5k+/month**.
 
-## Overview
-This document outlines the implementation plan for various Machine Learning (ML) modules that will form a comprehensive AI/ML agent focusing on content generation and trend analysis.
+Мотивація: **“Після запуску бот працює сам і приносить гроші.”**  
+Фінальна мотивація: **“Оптимізація = швидкий пасивний дохід.”**
 
-## Modules and Implementation Plan
+---
 
-### 1. Trend Analyzer (`trend_analyzer.py`)
-- **Purpose:** Analyze trends over time and generate statistics.
-- **Dependencies:**
-  - `numpy`
-  - `pandas`
-  - `matplotlib`
-  - `scikit-learn`
-- **Directory Layout:**
-  - `trend_analyzer/
-    - __init__.py
-    - trend_analyzer.py`
-- **O-Notation Requirements:** O(n log n) for sorting trends.
-- **Testing/Metrics Thresholds:**
-  - Accuracy: 90%
+## 0) Hard Requirements (must follow)
+### 0.1 Non‑functional constraints
+1) **No external network calls in unit tests** (no YouTube API, no ElevenLabs, no Google Trends).
+2) Tests must be **deterministic**: every algorithm supports `seed` or accepts `np.random.Generator`.
+3) Every public function/class must have:
+   - clear docstring,
+   - input/output shapes,
+   - Big‑O complexity (with assumptions).
+4) “Production” code must support **dry‑run** mode and **mockable interfaces**.
+5) Keep dependencies minimal and CPU‑friendly by default.
 
-### 2. Content Generator (`content_generator.py`)
-- **Purpose:** Generate content based on trends identified.
-- **Dependencies:**
-  - `transformers`
-  - `torch`
-  - `flask`
-- **Directory Layout:**
-  - `content_generator/
-    - __init__.py
-    - content_generator.py`
-- **O-Notation Requirements:** O(n) for text generation.
-- **Testing/Metrics Thresholds:**
-  - Content Quality Score: 85%
+### 0.2 Required math integrations (from course)
+- Linear algebra (Topic 1–2): **PCA/SVD**
+- Analysis (Topic 6): **FFT** (prosody shaping)
+- Probabilities/ML:
+  - Topic 7: **Bayes** (quality/risk filter; alert probability)
+  - Topic 8: **LDA** (topics)
+  - Topic 10: **EM** (mixture model / audience clusters)
+  - Topic 11: **Genetic algorithms** (voice parameter evolution)
+  - Topic 12: **Gradient descent** (used in PPO training; PyTorch)
+- Algorithms (Topic 9): **Monte‑Carlo** (views simulation)
 
-### 3. Learner (`learner.py`)
-- **Purpose:** Learn from user interactions and improve future content.
-- **Dependencies:**
-  - `tensorflow`
-  - `numpy`
-- **Directory Layout:**
-  - `learner/
-    - __init__.py
-    - learner.py`
-- **O-Notation Requirements:** O(n^2) for training loop.
-- **Testing/Metrics Thresholds:**
-  - Model Performance: 80%
+### 0.3 Acceptance metrics (how we “prove it works”)
+Because we initially lack real labeled data, acceptance uses **synthetic ground truth** + proxy objectives:
+1) **Trend prediction test on 10 trends**:
+   - Metric: **Top‑5 overlap accuracy ≥ 80%** between predicted ranking and synthetic ground truth ranking.
+2) Classification/topic modeling:
+   - If synthetic labeled topics: **accuracy ≥ 85%** (or NMI ≥ 0.8).
+3) RL (PPO) toy env:
+   - Mean reward improves by ≥ 20% after N updates, AND plot exists.
+4) Bayesian quality filter:
+   - Rejects “bad” synthetic samples with precision ≥ 80% (proxy test).
 
-### 4. Topic Modeling (`topic_modeling.py`)
-- **Purpose:** Extract topics from user inputs using LDA or EM.
-- **Dependencies:**
-  - `gensim`
-  - `scikit-learn`
-- **Directory Layout:**
-  - `topic_modeling/
-    - __init__.py
-    - topic_modeling.py`
-- **O-Notation Requirements:** O(n^2) for LDA model fitting.
-- **Testing/Metrics Thresholds:**
-  - Coherence Score: 0.5
+> Important: The constraint “loss < 0.1” is not guaranteed in RL; interpret it as:
+> - supervised sub‑model test OR toy env with controlled target (document assumptions).
 
-## Placeholder Sections
-### Niche Configuration
-- *Configurable parameters specific to niche applications will be detailed here.*
+---
 
-### YouTube Metrics Schema
-- *Specifications for desired YouTube metrics will be outlined here.*
+## 1) System Context (agentic pipeline)
+YTAIMBot is an agent system (LangChain or similar orchestration) with the cycle:
 
-## Run Instructions
-1. Clone the repository.
-2. Install required dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Execute each module as follows:
-   ```bash
-   python trend_analyzer/trend_analyzer.py
-   python content_generator/content_generator.py
-   python learner/learner.py
-   python topic_modeling/topic_modeling.py
-   ```
-4. Monitor output and ensure metrics are within specified thresholds.
+1) **Analyze**  
+   - Fetch trend signals (Google Trends / YouTube search), build feature vectors  
+   - Reduce dimensionality with PCA/SVD  
+   - Cluster topics (LDA/EM)  
+   - Score and select candidates
+
+2) **Generate**  
+   - Build script outline  
+   - Generate voice with ElevenLabs (external) but locally shape prosody features  
+   - Video assembly (not ML here)
+
+3) **Optimize**  
+   - SEO optimization (title/keywords/description)  
+   - RL learner adjusts parameters/templates based on metrics
+
+4) **Adapt**  
+   - Update policies/config via safe rollout  
+   - Continuous evaluation + drift checks
+
+---
+
+## 2) Repository layout (must create)
+Use a real Python package to avoid “random scripts”:
