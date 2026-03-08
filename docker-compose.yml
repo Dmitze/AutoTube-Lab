@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    environment:
+      - YTAIMBOT_DRY_RUN=${YTAIMBOT_DRY_RUN:-true}
+      - YTAIMBOT_SEED=${YTAIMBOT_SEED:-42}
+      - YTAIMBOT_DATA_DIR=/app/data
