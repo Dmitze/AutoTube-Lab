@@ -1,6 +1,6 @@
 # AI Agent Start Prompt & Summary Checklist — YouTube AI Money Bot 2026
 
-> Мотивація: **«З цією структурою AI‑бот працюватиме як експерт, прискорюючи розробку, забезпечуючи стабільність і дохід $5k+/міс.»**
+> Мотивація: **«З цією структурою AI-бот працюватиме як експерт, прискорюючи розробку, забезпечуючи стабільність і дохід $5k+/міс.»**
 
 ## 1. Purpose
 
@@ -282,8 +282,8 @@ Required output sections:
 
 ## 10. Related repository documents
 
-- `/home/runner/work/YTAIMBot/YTAIMBot/docs/AI_AGENT_ML_IMPLEMENTATION_PROMPT.md`
-- `/home/runner/work/YTAIMBot/YTAIMBot/docs/AI_AGENT_ML_IMPLEMENTATION_PROMPT_V2.md`
-- `/home/runner/work/YTAIMBot/YTAIMBot/Промт для AI-Агента в Ролі Backend Developer.txt`
-- `/home/runner/work/YTAIMBot/YTAIMBot/Промт для AI-Агента в Ролі DevOps SRE Engineer.txt`
-- `/home/runner/work/YTAIMBot/YTAIMBot/tests/README.md`
+- `docs/AI_AGENT_ML_IMPLEMENTATION_PROMPT.md`
+- `docs/AI_AGENT_ML_IMPLEMENTATION_PROMPT_V2.md`
+- `Промт для AI-Агента в Ролі Backend Developer.txt`
+- `Промт для AI-Агента в Ролі DevOps SRE Engineer.txt`
+- `tests/README.md`
