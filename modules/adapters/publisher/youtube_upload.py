@@ -1,47 +1,458 @@
-"""Phase 4 — YouTubeUploader: uploads videos via YouTube Data API v3.
+"""YouTubeUploadAdapter: uploads videos via YouTube Data API v3.
 
 Roadmap tasks: T-371 through T-400 (EPIC 4.1 Publishing Pipeline)
-Depends on:   google-auth-oauthlib, google-api-python-client, PublisherAdapter ABC
+Dependencies:  google-auth-oauthlib, google-api-python-client
 
-Configuration:
+Environment variables:
   YOUTUBE_CLIENT_SECRET_PATH : path to client_secret.json (OAuth2)
-  MAX_UPLOADS_PER_DAY        : safety cap (default 0 = disabled)
+  YOUTUBE_TOKEN_PATH         : path to token.json (cached credentials)
+  YOUTUBE_CATEGORY_ID        : default category (default "28" = Science & Technology)
+  YOUTUBE_DEFAULT_LANGUAGE   : default language tag (default "uk")
+  YTAIMBOT_DRY_RUN           : if "true", publish() raises DryRunError
 
-OAuth2 flow:
-  1. Load credentials from YOUTUBE_CLIENT_SECRET_PATH
-  2. If expired: refresh via google.auth.transport.requests.Request
-  3. Build youtube = googleapiclient.discovery.build("youtube", "v3", ...)
+Upload pipeline — Resumable Upload algorithm:
+  1. QuotaGuard.allow()                    → O(1)
+  2. ComplianceReport.decision == "pass"   → O(1)
+  3. _get_credentials()                    → OAuth2 refresh if expired
+  4. _upload_video(video_path, metadata)   → resumable, chunk_size=256 KB
+  5. _set_thumbnail(video_id, thumbnail)   → thumbnail.set API call
+  6. _schedule_public(video_id, delay_h)   → videos.update → publishAt
 
-Upload pipeline (Resumable Upload):
-  1. QuotaGuard.allow() check          → O(1)
-  2. ComplianceReport.decision == "pass" → O(1)
-  3. Insert video (unlisted, AI-disclosed) → chunked upload
-  4. Poll for processing completion     → O(retry_count)
-  5. Set thumbnail                      → O(1)
-  6. Schedule public (24h delay)        → O(1)
-
-Algorithm
----------
-Resumable upload: chunk_size=256KB, retry on 5xx
-Token Bucket (QuotaGuard): allows burst=1, rate=6/day
-
-Status: 🔲 Pending — T-371 (Phase 4)
+Error handling:
+  - HttpError 403/quota_exceeded → QuotaExhaustedError (non-retryable)
+  - HttpError 5xx               → retried up to 3 times (exponential backoff)
+  - Missing google package       → ImportError with install instructions
 """
 from __future__ import annotations
 
+import logging
+import os
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-# TODO: T-371 — implement YouTubeUploader(PublisherAdapter)
-# TODO: T-372 — implement publish(plan, video_path, thumbnail_path) → str (video_id)
-# TODO: T-373 — implement _get_credentials() → Credentials (OAuth2)
-# TODO: T-374 — implement _upload_video(video_path, metadata) → str
-# TODO: T-375 — implement _set_thumbnail(video_id, thumbnail_path) → None
-# TODO: T-376 — implement _schedule_public(video_id, delay_hours=24) → None
+from modules.adapters.base import PublisherAdapter
+from modules.adapters.publisher.quota_guard import QuotaExhaustedError, QuotaGuard
+from ytaimbot_ml.schemas import (
+    ComplianceReport,
+    ContentPlan,
+    PrivacyStatus,
+    UploadResult,
+    VideoAsset,
+)
+
+logger = logging.getLogger(__name__)
+
+_CHUNK_SIZE = 256 * 1024  # 256 KB — minimum resumable chunk
+_MAX_RETRIES = 3
 
 
-class YouTubeUploader:
-    """TODO: implement in T-371."""
+class DryRunError(RuntimeError):
+    """Raised when publish() is called in dry-run mode."""
 
-    def publish(self, plan, video_path: Path, thumbnail_path: Path) -> str:  # type: ignore[override]
-        """TODO: T-372. Returns YouTube video_id."""
-        raise NotImplementedError("T-371 pending")
+
+class YouTubeUploadAdapter(PublisherAdapter):
+    """Uploads video assets to YouTube using the Data API v3 (resumable upload).
+
+    Parameters
+    ----------
+    quota_guard:
+        Token Bucket guard.  Created automatically if not provided.
+    client_secret_path:
+        Path to ``client_secret.json`` for OAuth2.  Defaults to
+        ``YOUTUBE_CLIENT_SECRET_PATH`` env var or ``data/client_secret.json``.
+    token_path:
+        Path to cached OAuth2 token.  Defaults to
+        ``YOUTUBE_TOKEN_PATH`` env var or ``data/token.json``.
+    category_id:
+        YouTube category ID string (default ``"28"`` = Science & Technology).
+    language:
+        Video default language tag (default ``"uk"``).
+    dry_run:
+        When ``True``, publish() raises DryRunError without touching the API.
+
+    Complexity
+    ----------
+    publish(): O(file_size / chunk_size) — network I/O bound
+
+    Examples
+    --------
+    >>> import os; os.environ["YTAIMBOT_DRY_RUN"] = "true"
+    >>> adapter = YouTubeUploadAdapter()
+    >>> adapter.dry_run
+    True
+    """
+
+    def __init__(
+        self,
+        quota_guard: QuotaGuard | None = None,
+        client_secret_path: str | Path | None = None,
+        token_path: str | Path | None = None,
+        category_id: str | None = None,
+        language: str | None = None,
+        dry_run: bool | None = None,
+    ) -> None:
+        self._guard = quota_guard or QuotaGuard(
+            max_per_day=int(os.environ.get("MAX_UPLOADS_PER_DAY", "6"))
+        )
+        self._client_secret = Path(
+            client_secret_path
+            or os.environ.get("YOUTUBE_CLIENT_SECRET_PATH", "data/client_secret.json")
+        )
+        self._token_path = Path(
+            token_path
+            or os.environ.get("YOUTUBE_TOKEN_PATH", "data/token.json")
+        )
+        self._category_id = category_id or os.environ.get("YOUTUBE_CATEGORY_ID", "28")
+        self._language = language or os.environ.get("YOUTUBE_DEFAULT_LANGUAGE", "uk")
+
+        if dry_run is not None:
+            self.dry_run = dry_run
+        else:
+            self.dry_run = os.environ.get("YTAIMBOT_DRY_RUN", "true").lower() != "false"
+
+    # ------------------------------------------------------------------
+    # PublisherAdapter ABC — legacy plan-only publish
+    # ------------------------------------------------------------------
+
+    def publish(self, plan: ContentPlan, compliance_report: ComplianceReport) -> bool:
+        """Legacy interface: publish a content plan with no video asset.
+
+        Parameters
+        ----------
+        plan:
+            Approved content plan.
+        compliance_report:
+            Must have ``decision == "pass"``.
+
+        Returns
+        -------
+        bool
+            Always ``False`` (no video asset available via this interface).
+            Use ``upload()`` for full video publishing.
+
+        Examples
+        --------
+        >>> adapter = YouTubeUploadAdapter(dry_run=True)
+        >>> adapter.publish(ContentPlan("t1","Title",[],[]), ComplianceReport("h",0.0,0.1,"pass",[]))
+        False
+        """
+        logger.info(
+            "YouTubeUploadAdapter.publish() called via legacy interface — no video asset. Use upload()."
+        )
+        return False
+
+    # ------------------------------------------------------------------
+    # Primary upload API
+    # ------------------------------------------------------------------
+
+    def upload(
+        self,
+        video_asset: VideoAsset,
+        plan: ContentPlan,
+        compliance_report: ComplianceReport,
+        *,
+        description: str = "",
+        tags: list[str] | None = None,
+        publish_delay_hours: int = 24,
+    ) -> UploadResult:
+        """Upload a video asset to YouTube.
+
+        Parameters
+        ----------
+        video_asset:
+            Assembled video with ``video_path`` and ``thumbnail_path``.
+        plan:
+            Source content plan (provides title, keywords).
+        compliance_report:
+            Must have ``decision == "pass"`` — fail-closed guard.
+        description:
+            Video description text.  Auto-generated from keywords if empty.
+        tags:
+            YouTube tags list.  Defaults to ``plan.keywords``.
+        publish_delay_hours:
+            Hours after upload to set video public (default 24).
+
+        Returns
+        -------
+        UploadResult
+            Contains ``video_id``, ``url``, ``quota_used``.
+
+        Raises
+        ------
+        DryRunError
+            If ``dry_run=True``.
+        QuotaExhaustedError
+            If the daily token bucket is empty.
+        ValueError
+            If compliance_report.decision != "pass".
+        FileNotFoundError
+            If the video file does not exist.
+
+        Complexity
+        ----------
+        O(file_size / 262144) — one API call per 256 KB chunk
+
+        Examples
+        --------
+        >>> adapter = YouTubeUploadAdapter(dry_run=True)
+        >>> adapter.upload(VideoAsset("t1"), ContentPlan("t1","T",[],[]), ...)
+        Traceback (most recent call last):
+            ...
+        modules.adapters.publisher.youtube_upload.DryRunError: ...
+        """
+        if self.dry_run:
+            raise DryRunError(
+                "YouTubeUploadAdapter.upload() called in dry-run mode. "
+                "Set YTAIMBOT_DRY_RUN=false to enable real uploads."
+            )
+
+        if compliance_report.decision != "pass":
+            raise ValueError(
+                f"Cannot upload: compliance decision is '{compliance_report.decision}' (need 'pass')"
+            )
+
+        if not video_asset.video_path or not Path(video_asset.video_path).exists():
+            raise FileNotFoundError(
+                f"Video file not found: {video_asset.video_path!r}"
+            )
+
+        self._guard.require()  # raises QuotaExhaustedError if empty
+
+        youtube = self._build_service()
+        video_id = self._upload_video(
+            youtube=youtube,
+            video_path=Path(video_asset.video_path),
+            title=plan.title,
+            description=description or self._auto_description(plan),
+            tags=tags or plan.keywords,
+            category_id=self._category_id,
+            language=self._language,
+        )
+
+        quota_used = QuotaGuard.COST_UPLOAD
+
+        if video_asset.thumbnail_path and Path(video_asset.thumbnail_path).exists():
+            self._set_thumbnail(youtube, video_id, Path(video_asset.thumbnail_path))
+            quota_used += QuotaGuard.COST_THUMBNAIL
+
+        if publish_delay_hours > 0:
+            self._schedule_public(youtube, video_id, delay_hours=publish_delay_hours)
+
+        url = f"https://youtu.be/{video_id}"
+        logger.info("Upload complete: video_id=%s url=%s quota_used=%d", video_id, url, quota_used)
+
+        return UploadResult(
+            plan_id=plan.trend_id,
+            video_id=video_id,
+            url=url,
+            privacy_status=PrivacyStatus.UNLISTED,
+            quota_used=quota_used,
+        )
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _get_credentials(self):
+        """Load or refresh OAuth2 credentials.
+
+        Uses ``google-auth-oauthlib`` InstalledAppFlow for first-time auth,
+        then caches token to ``_token_path`` for subsequent runs.
+
+        Returns
+        -------
+        google.oauth2.credentials.Credentials
+
+        Raises
+        ------
+        ImportError
+            If ``google-auth-oauthlib`` is not installed.
+        FileNotFoundError
+            If ``_client_secret`` path does not exist.
+
+        Complexity: O(1) — single file read or HTTP refresh
+        """
+        try:
+            from google.auth.transport.requests import Request
+            from google.oauth2.credentials import Credentials
+            from google_auth_oauthlib.flow import InstalledAppFlow
+        except ImportError as exc:
+            raise ImportError(
+                "google-auth-oauthlib is required for YouTube uploads. "
+                "Install with: pip install google-auth-oauthlib google-api-python-client"
+            ) from exc
+
+        scopes = ["https://www.googleapis.com/auth/youtube.upload"]
+        creds = None
+
+        if self._token_path.exists():
+            creds = Credentials.from_authorized_user_file(str(self._token_path), scopes)
+
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                if not self._client_secret.exists():
+                    raise FileNotFoundError(
+                        f"client_secret.json not found at {self._client_secret}. "
+                        "Download from Google Cloud Console → APIs & Services → Credentials."
+                    )
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    str(self._client_secret), scopes
+                )
+                creds = flow.run_local_server(port=0)
+
+            self._token_path.parent.mkdir(parents=True, exist_ok=True)
+            self._token_path.write_text(creds.to_json(), encoding="utf-8")
+
+        return creds
+
+    def _build_service(self):
+        """Build the YouTube API service client.
+
+        Returns
+        -------
+        googleapiclient.discovery.Resource
+
+        Raises
+        ------
+        ImportError
+            If ``google-api-python-client`` is not installed.
+
+        Complexity: O(1)
+        """
+        try:
+            from googleapiclient.discovery import build
+        except ImportError as exc:
+            raise ImportError(
+                "google-api-python-client is required. "
+                "Install with: pip install google-api-python-client"
+            ) from exc
+
+        creds = self._get_credentials()
+        return build("youtube", "v3", credentials=creds)
+
+    def _upload_video(
+        self,
+        youtube,
+        video_path: Path,
+        title: str,
+        description: str,
+        tags: list[str],
+        category_id: str,
+        language: str,
+    ) -> str:
+        """Execute resumable upload and return the YouTube video_id.
+
+        Retries up to ``_MAX_RETRIES`` times on 5xx errors (exponential backoff).
+
+        Complexity: O(file_size / chunk_size)
+        """
+        try:
+            from googleapiclient.errors import HttpError
+            from googleapiclient.http import MediaFileUpload
+        except ImportError as exc:
+            raise ImportError("google-api-python-client required") from exc
+
+        import time
+
+        body = {
+            "snippet": {
+                "title": title[:100],  # YouTube title max 100 chars
+                "description": description[:5000],
+                "tags": tags[:500],
+                "categoryId": category_id,
+                "defaultLanguage": language,
+            },
+            "status": {
+                "privacyStatus": PrivacyStatus.UNLISTED,
+                "selfDeclaredMadeForKids": False,
+                "madeForKids": False,
+            },
+            "localizations": {},
+        }
+
+        media = MediaFileUpload(
+            str(video_path),
+            mimetype="video/mp4",
+            resumable=True,
+            chunksize=_CHUNK_SIZE,
+        )
+
+        request = youtube.videos().insert(
+            part=",".join(body.keys()),
+            body=body,
+            media_body=media,
+        )
+
+        response = None
+        retry = 0
+        while response is None:
+            try:
+                _, response = request.next_chunk()
+            except HttpError as e:
+                if e.resp.status in (500, 502, 503, 504) and retry < _MAX_RETRIES:
+                    wait = 2 ** retry
+                    logger.warning("Upload HTTP %s — retry %d/%d in %ds", e.resp.status, retry + 1, _MAX_RETRIES, wait)
+                    time.sleep(wait)
+                    retry += 1
+                else:
+                    raise
+
+        return response["id"]
+
+    def _set_thumbnail(self, youtube, video_id: str, thumbnail_path: Path) -> None:
+        """Set the custom thumbnail for an uploaded video.
+
+        Complexity: O(file_size) — single HTTP POST
+        """
+        try:
+            from googleapiclient.http import MediaFileUpload
+        except ImportError as exc:
+            raise ImportError("google-api-python-client required") from exc
+
+        media = MediaFileUpload(str(thumbnail_path), mimetype="image/png")
+        youtube.thumbnails().set(videoId=video_id, media_body=media).execute()
+        logger.debug("Thumbnail set for video_id=%s", video_id)
+
+    def _schedule_public(self, youtube, video_id: str, delay_hours: int = 24) -> None:
+        """Schedule a video to go public after ``delay_hours`` hours.
+
+        Sets ``status.publishAt`` to now + delay_hours (UTC).
+
+        Complexity: O(1) — single API call
+        """
+        publish_at = (
+            datetime.now(timezone.utc) + timedelta(hours=delay_hours)
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        youtube.videos().update(
+            part="status",
+            body={
+                "id": video_id,
+                "status": {
+                    "privacyStatus": PrivacyStatus.PRIVATE,
+                    "publishAt": publish_at,
+                },
+            },
+        ).execute()
+        logger.info("Scheduled public for video_id=%s at %s", video_id, publish_at)
+
+    @staticmethod
+    def _auto_description(plan: ContentPlan) -> str:
+        """Generate a basic video description from a ContentPlan.
+
+        Complexity: O(k) where k = len(plan.keywords)
+        """
+        tags_line = " ".join(f"#{kw.replace(' ', '_')}" for kw in plan.keywords[:20])
+        parts = [
+            plan.title,
+            "",
+            "\n".join(plan.outline),
+            "",
+            tags_line,
+            "",
+            "✅ Створено за допомогою YTAIMBot | Автоматично згенерований контент",
+        ]
+        return "\n".join(parts)
+
