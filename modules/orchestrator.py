@@ -10,15 +10,17 @@ Stages
 6. gate            — compliance check via BayesQualityFilter
 7. generate_script — LLM generates 6-section script per approved plan [Phase 2]
 8. synthesize_tts  — EdgeTTS converts script to MP3 audio              [Phase 2]
-9. publish         — publish plans that passed the gate (skip in dry_run)
+9. assemble_video  — VideoAssembler + ThumbnailGenerator               [Phase 4]
+10. publish        — YouTube upload with QuotaGuard (skip in dry_run)  [Phase 5]
 
 Fail-closed design: publish is NEVER called unless a ComplianceReport
-with decision="pass" exists for the plan.
+with decision="pass" exists for the plan AND YTAIMBOT_DRY_RUN=false.
 
 Adapter auto-selection:
   Trend  (T-069): YOUTUBE_API_KEY + GOOGLE_TRENDS_GEO → CompositeTrendSource
   LLM    (T-082): GROQ_API_KEY → GroqAdapter | OLLAMA_URL → OllamaAdapter
   TTS    (T-098): TTS_VOICE set → EdgeTTSAdapter (default uk-UA-OstapNeural)
+  Upload (T-371): YOUTUBE_CLIENT_SECRET_PATH set → YouTubeUploadAdapter
 """
 
 from __future__ import annotations
@@ -44,6 +46,7 @@ from ytaimbot_ml.schemas import (
     Script,
     TrendRanking,
     TrendSignal,
+    UploadResult,
 )
 from ytaimbot_ml.trend_analyzer import TrendAnalyzer
 from ytaimbot_ml.utils.random import make_rng
@@ -195,6 +198,38 @@ def build_tts_adapter() -> Optional[TTSAdapter]:
     except ImportError:
         logger.info("TTS: edge-tts not installed — audio synthesis disabled")
         return None
+
+
+def build_youtube_uploader() -> Optional[PublisherAdapter]:
+    """Build YouTubeUploadAdapter when client_secret.json is configured.
+
+    Selection logic:
+      YOUTUBE_CLIENT_SECRET_PATH exists → YouTubeUploadAdapter (dry_run from env)
+      Not configured                    → None (publish stage skipped)
+
+    Returns
+    -------
+    PublisherAdapter | None
+        Configured adapter, or None if OAuth2 credentials not present.
+
+    Complexity
+    ----------
+    O(1)
+
+    Examples
+    --------
+    >>> import os; os.environ.pop("YOUTUBE_CLIENT_SECRET_PATH", None)
+    >>> build_youtube_uploader() is None
+    True
+    """
+    secret_path = os.environ.get("YOUTUBE_CLIENT_SECRET_PATH", "data/client_secret.json")
+    from pathlib import Path as _Path
+    if _Path(secret_path).exists():
+        from modules.adapters.publisher.youtube_upload import YouTubeUploadAdapter
+        logger.info("Publisher: YouTubeUploadAdapter (secret=%s)", secret_path)
+        return YouTubeUploadAdapter(client_secret_path=secret_path)
+    logger.info("Publisher: no client_secret.json — upload stage disabled")
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -471,6 +506,15 @@ def _plan_to_features(plan: ContentPlan) -> dict[str, float]:
         "keyword_density": n_keywords,
         "outline_depth": n_outline,
     }
+
+
+def _get_title_optimizer():
+    """Lazy-load TitleOptimizer. Returns None if seo package unavailable."""
+    try:
+        from ytaimbot_ml.seo.title_optimizer import TitleOptimizer  # noqa: PLC0415
+        return TitleOptimizer(year=os.environ.get("VIDEO_YEAR", "2026"))
+    except ImportError:
+        return None
 
 
 # ---------------------------------------------------------------------------
