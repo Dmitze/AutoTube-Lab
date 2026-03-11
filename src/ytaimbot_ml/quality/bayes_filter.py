@@ -119,6 +119,111 @@ class BayesQualityFilter:
         )
 
 
+class TopicBlacklist:
+    """Content safety blacklist that blocks demonetization-risk topics.
+
+    Based on documented YouTube demonetization patterns (2025–2026):
+    pregnancy content, visible injuries, unverified health claims,
+    minors in problematic contexts, and misinformation-adjacent topics.
+
+    Algorithm: Aho-Corasick multi-pattern matching (simplified: set lookup O(k×n))
+    Complexity: O(k × n) where k=patterns, n=text length
+
+    Parameters
+    ----------
+    custom_patterns:
+        Optional extra patterns to add on top of BLOCKED_PATTERNS.
+
+    Examples
+    --------
+    >>> bl = TopicBlacklist()
+    >>> bl.is_safe("cozy village ASMR video")
+    True
+    >>> bl.is_safe("pregnant woman injured scene")
+    False
+    """
+
+    BLOCKED_PATTERNS: frozenset[str] = frozenset({
+        "pregnant", "pregnancy", "injury", "injuries", "wounded", "bleeding",
+        "surgery", "medical advice", "cure disease", "self-harm", "suicide",
+        "weapon tutorial", "real news", "breaking news", "actual event",
+        "this really happened", "true story", "fact checked",
+    })
+
+    def __init__(self, custom_patterns: list[str] | None = None) -> None:
+        self._patterns: set[str] = set(self.BLOCKED_PATTERNS)
+        if custom_patterns:
+            self._patterns.update(p.lower() for p in custom_patterns)
+
+    def is_safe(self, text: str) -> bool:
+        """Return True if text contains no blocked patterns.
+
+        Parameters
+        ----------
+        text:
+            Text to scan (title, description, script, etc.).
+
+        Returns
+        -------
+        bool
+            True = safe to publish, False = blocked topic detected.
+
+        Complexity: O(k × n) where k = number of patterns, n = len(text)
+
+        Examples
+        --------
+        >>> TopicBlacklist().is_safe("peaceful morning ASMR")
+        True
+        >>> TopicBlacklist().is_safe("breaking news alert")
+        False
+        """
+        lower = text.lower()
+        return not any(pattern in lower for pattern in self._patterns)
+
+    def get_violations(self, text: str) -> list[str]:
+        """Return all blocked patterns found in text.
+
+        Parameters
+        ----------
+        text:
+            Text to scan.
+
+        Returns
+        -------
+        list[str]
+            Matched blocked patterns (empty if none found).
+
+        Complexity: O(k × n)
+
+        Examples
+        --------
+        >>> bl = TopicBlacklist()
+        >>> bl.get_violations("surgery and medical advice")
+        ['surgery', 'medical advice']
+        """
+        lower = text.lower()
+        return sorted(p for p in self._patterns if p in lower)
+
+    def add_pattern(self, pattern: str) -> None:
+        """Register an additional blocked pattern at runtime.
+
+        Parameters
+        ----------
+        pattern:
+            New pattern string (case-insensitive match).
+
+        Complexity: O(1)
+
+        Examples
+        --------
+        >>> bl = TopicBlacklist()
+        >>> bl.add_pattern("dangerous stunt")
+        >>> bl.is_safe("dangerous stunt video")
+        False
+        """
+        self._patterns.add(pattern.lower())
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------

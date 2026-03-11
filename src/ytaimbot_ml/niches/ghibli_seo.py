@@ -172,6 +172,9 @@ class GhibliSEO:
     MUST_HAVE_KEYWORDS always appear in title/tags:
         ``["cozy", "ASMR", "Ghibli", "relaxing", "no talking"]``
 
+    A mandatory AI disclaimer block is always appended to descriptions
+    to protect against YouTube auto-demonetization (2025–2026 policy).
+
     Parameters
     ----------
     sub_niche:
@@ -181,10 +184,11 @@ class GhibliSEO:
 
     Complexity
     ----------
-    generate_title():       O(t) where t = number of title templates
-    generate_tags():        O(1)
-    generate_description(): O(1)
-    score_title():          O(w) where w = words in title
+    generate_title():           O(t) where t = number of title templates
+    generate_tags():            O(1)
+    generate_description():     O(1)
+    score_title():              O(w) where w = words in title
+    contains_trigger_topics():  O(k × n) where k=patterns, n=text length
 
     Examples
     --------
@@ -197,6 +201,23 @@ class GhibliSEO:
     """
 
     MUST_HAVE_KEYWORDS: list[str] = ["cozy", "ASMR", "Ghibli", "relaxing", "no talking"]
+
+    # Anti-demonetization: disclaimer appended to every description
+    AI_DISCLAIMER: str = (
+        "🤖 This video was entirely created using Artificial Intelligence tools "
+        "(AI-generated images, animation, voice, and music).\n"
+        "All characters, stories, and scenarios are completely fictional. "
+        "All depicted characters are adults (18+). "
+        "This content is for entertainment purposes only and does not represent real events or people.\n"
+        "© {year} — AI-generated creative content."
+    )
+
+    # Topics that trigger YouTube demonetization risk
+    TRIGGER_TOPICS: list[str] = [
+        "pregnancy", "pregnant", "injury", "wound", "blood", "surgery",
+        "medical advice", "health cure", "self-harm", "weapon", "minor",
+        "child actor", "real news", "breaking news",
+    ]
 
     def __init__(
         self,
@@ -316,10 +337,11 @@ class GhibliSEO:
         return unique_tags
 
     def generate_description(self, topic: str, scene_count: int = 50) -> str:
-        """Generate a 2-paragraph YouTube description for the video.
+        """Generate a YouTube description with SEO paragraphs and AI disclaimer.
 
         Paragraph 1: Atmosphere/mood hook with topic.
         Paragraph 2: SEO-boosted tags section with MUST_HAVE keywords.
+        Paragraph 3: Mandatory AI disclaimer (anti-demonetization protection).
 
         Parameters
         ----------
@@ -331,7 +353,7 @@ class GhibliSEO:
         Returns
         -------
         str
-            Two-paragraph description suitable for YouTube upload.
+            Three-paragraph description with AI disclaimer appended.
 
         Complexity: O(1)
 
@@ -340,6 +362,8 @@ class GhibliSEO:
         >>> seo = GhibliSEO(SubNiche.VILLAGE_LIFE)
         >>> desc = seo.generate_description("morning in the village")
         >>> "Ghibli" in desc and "ASMR" in desc
+        True
+        >>> "Artificial Intelligence" in desc
         True
         >>> len(desc) > 100
         True
@@ -357,7 +381,38 @@ class GhibliSEO:
             f"Tags: Ghibli ASMR, {niche_label} ASMR, relaxing animation, cozy sounds, "
             f"no talking ASMR, sleep sounds, Studio Ghibli ambience, {topic}"
         )
-        return f"{para1}\n\n{para2}"
+        year = datetime.datetime.now(datetime.timezone.utc).year
+        disclaimer = self.AI_DISCLAIMER.format(year=year)
+        return f"{para1}\n\n{para2}\n\n{disclaimer}"
+
+    def contains_trigger_topics(self, text: str) -> bool:
+        """Return True if any TRIGGER_TOPICS pattern appears in text (case-insensitive).
+
+        Used as a pre-publish safety check to flag content that risks
+        YouTube demonetization before the video is uploaded.
+
+        Parameters
+        ----------
+        text:
+            Any text to scan — title, description, script, tags, etc.
+
+        Returns
+        -------
+        bool
+            True if at least one trigger topic is found.
+
+        Complexity: O(k × n) where k = len(TRIGGER_TOPICS), n = len(text)
+
+        Examples
+        --------
+        >>> seo = GhibliSEO(SubNiche.VILLAGE_LIFE)
+        >>> seo.contains_trigger_topics("cozy village ASMR morning")
+        False
+        >>> seo.contains_trigger_topics("A pregnant character appears in a scene")
+        True
+        """
+        lower_text = text.lower()
+        return any(topic in lower_text for topic in self.TRIGGER_TOPICS)
 
     def score_title(self, title: str) -> float:
         """Score a title for CTR potential using MUST_HAVE keyword coverage.

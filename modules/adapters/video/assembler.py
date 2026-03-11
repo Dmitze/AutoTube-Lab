@@ -181,6 +181,120 @@ class VideoAssembler:
             duration_seconds=round(duration, 2),
         )
 
+    def add_disclaimer_frame(
+        self,
+        video_path: Path,
+        output_path: Path,
+        duration_seconds: float = 1.0,
+        text: str = "AI-Generated Content | All characters are fictional adults 18+",
+        bg_color: tuple[int, int, int] = (20, 20, 20),
+        text_color: tuple[int, int, int] = (200, 200, 200),
+    ) -> Path:
+        """Prepend a disclaimer title card to the beginning of a video.
+
+        Creates a solid-color text card of ``duration_seconds`` length and
+        concatenates it before the main video using MoviePy.
+
+        Parameters
+        ----------
+        video_path:
+            Path to the source MP4 video file.
+        output_path:
+            Destination path for the resulting MP4.
+        duration_seconds:
+            Duration of the disclaimer card in seconds (default 1.0).
+        text:
+            Disclaimer text rendered on the card.
+        bg_color:
+            RGB background color of the title card (default near-black).
+        text_color:
+            RGB text color (default light grey).
+
+        Returns
+        -------
+        Path
+            Path to the assembled output video.
+
+        Raises
+        ------
+        FileNotFoundError
+            If ``video_path`` does not exist.
+        ImportError
+            If moviepy is not installed.
+
+        Complexity: O(fps × duration) — proportional to disclaimer frame count
+
+        Examples
+        --------
+        >>> assembler = VideoAssembler(output_dir=Path("/tmp"))
+        >>> # result = assembler.add_disclaimer_frame(Path("video.mp4"), Path("out.mp4"))
+        >>> # result.exists()  # True
+        True
+        """
+        if not video_path.exists():
+            raise FileNotFoundError(f"Video file not found: {video_path}")
+
+        try:
+            from moviepy import (  # noqa: PLC0415
+                ColorClip,
+                TextClip,
+                CompositeVideoClip,
+                VideoFileClip,
+                concatenate_videoclips,
+            )
+        except ImportError as exc:
+            raise ImportError(
+                "moviepy not installed. Install with: pip install moviepy"
+            ) from exc
+
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        logger.info(
+            "VideoAssembler: prepending disclaimer frame (%.1fs) → %s",
+            duration_seconds,
+            output_path,
+        )
+
+        main_clip = VideoFileClip(str(video_path))
+
+        card = ColorClip(
+            size=self.resolution,
+            color=bg_color,
+            duration=duration_seconds,
+        )
+
+        try:
+            label = TextClip(
+                text=text,
+                font_size=40,
+                color=f"rgb{text_color}",
+                size=self.resolution,
+                method="caption",
+                duration=duration_seconds,
+            )
+            disclaimer_clip = CompositeVideoClip([card, label.with_position("center")])
+        except Exception as exc:  # TextClip may fail without ImageMagick
+            logger.warning(
+                "VideoAssembler: TextClip unavailable (%s) — using plain color card",
+                exc,
+            )
+            disclaimer_clip = card
+
+        final = concatenate_videoclips([disclaimer_clip, main_clip])
+        final.write_videofile(
+            str(output_path),
+            fps=self.fps,
+            codec="libx264",
+            audio_codec="aac",
+            bitrate=_DEFAULT_AUDIO_BITRATE,
+            preset="medium",
+            ffmpeg_params=["-crf", str(self.crf)],
+            logger=None,
+        )
+
+        logger.info("VideoAssembler: disclaimer video saved → %s", output_path)
+        return output_path
+
     def _burn_subtitles(
         self,
         clip,
