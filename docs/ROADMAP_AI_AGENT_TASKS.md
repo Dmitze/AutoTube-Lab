@@ -3204,8 +3204,10 @@ POST-LAUNCH:
 - [ ] Sphinx docs генеруються без warnings
 - [ ] Всі Mermaid діаграми рендеряться на GitHub
 - [ ] Перше відео опубліковано на YouTube
-- [ ] CTR ≥ 4% (ціль ≥ 6%) за перший місяць
+- [ ] CTR ≥ 6% (ціль ≥ 8–14%) за перший місяць
 - [ ] Retention 30s ≥ 60% (ціль ≥ 70%)
+- [ ] Довжина відео ≥ 8 хвилин (більше mid-roll реклами)
+- [ ] 100% відео мають AI-дисклеймер в описі та 1-сек кадр
 - [ ] Revenue ≥ $1K/місяць за Місяць 2–3
 - [ ] Revenue ≥ $5K/місяць за Місяць 4–6 🚀
 
@@ -4175,7 +4177,175 @@ def bootstrap_ci(data: np.ndarray,
 
 ---
 
-## 📊 ОНОВЛЕНИЙ ЗАГАЛЬНИЙ ПРОГРЕС (v2.1)
+═══════════════════════════════════════════════════════════════════
+## 🛡️ PHASE P12: ANTI-DEMONETIZATION PROTECTION — 🔲 PLANNED
+═══════════════════════════════════════════════════════════════════
+
+**Ціль:** Захист кожного відео від авто-демонетизації YouTube AI. Задокументовані кейси (Роман, $20k/2 місяці): без дисклеймерів — канал демонетизується за 3–4 тижні. З захистом — монетизація тримається стабільно.
+
+**Залежності:** P3 (VideoAssembler), P2 (SEO / опис), P8 (BayesFilter)
+
+**Пріоритет:** 🔴 CRITICAL — без цього весь контент може бути знятий з монетизації
+
+### 🚨 ПРИЧИНИ ДЕМОНЕТИЗАЦІЇ (задокументовано 2025–2026)
+
+| Тригер | Ризик | Захист |
+|--------|-------|--------|
+| Контент про вагітність / пологи | 🔴 Авто-бан | Blocklist: "pregnant", "pregnancy", "labor" |
+| Показ травм / крові / ран | 🔴 Авто-бан | Blocklist: "injury", "wound", "bleeding" |
+| Медичні поради без джерел | 🔴 Авто-бан | Blocklist: "medical advice", "cure disease" |
+| "Ненадійний контент" (unreliable) | 🟡 Дистрибуція ↓ | Дисклеймер "fictional content" в описі |
+| AI-генерований без позначки | 🟡 Дистрибуція ↓ | Кадр-дисклеймер 1 сек на початку відео |
+| Неповнолітні персонажі | 🔴 Авто-бан | Дисклеймер "all characters are adults 18+" |
+| "Справжні новини" / реальні події | 🟡 Дистрибуція ↓ | Blocklist: "real news", "breaking news" |
+| Зброя, самоушкодження | 🔴 Авто-бан | Blocklist: "weapon tutorial", "self-harm" |
+
+### 🔑 КЛЮЧОВІ ПРАВИЛА ЗАХИСТУ
+
+```
+DEMONT-01: КОЖНЕ відео ПОВИННЕ мати AI-дисклеймер у описі (першi 2 рядки)
+DEMONT-02: КОЖНЕ відео ПОВИННЕ мати 1-секундний кадр-дисклеймер на початку
+DEMONT-03: TopicBlacklist.is_safe() = True — ОБОВЯЗКОВА умова для публікації (fail-closed)
+DEMONT-04: "All characters are adults (18+)" — у КОЖНОМУ описі
+DEMONT-05: "AI-Generated Content" — у КОЖНІЙ назві або описі
+DEMONT-06: Довжина відео ≥ 8 хвилин — більше mid-roll реклами = більший дохід
+DEMONT-07: CTR ціль = 8–14% (оновлено з 6% — реальні дані від каналів $20k/міс)
+DEMONT-08: Аккаунт < 3 місяців отримує менше переглядів від YouTube — терпіння!
+```
+
+### Нові компоненти
+
+- `src/ytaimbot_ml/quality/topic_blacklist.py` — Aho-Corasick детектор заборонених тем
+- `src/ytaimbot_ml/niches/disclaimer_templates.py` — шаблони AI-дисклеймерів для всіх ніш
+- Оновлення: `modules/adapters/video/assembler.py` → `add_disclaimer_frame()`
+- Оновлення: `src/ytaimbot_ml/niches/ghibli_seo.py` → обов'язковий дисклеймер в описі
+- Оновлення: `src/ytaimbot_ml/quality/bayes_filter.py` → інтеграція TopicBlacklist
+
+### Таблиця задач Phase P12
+
+| ID | Статус | Задача | Файл(и) | Склад. | Залежить від |
+|----|--------|--------|---------|--------|-------------|
+| T-920 | 🔲 | TopicBlacklist: Aho-Corasick детектор (45+ заблокованих тем) | `src/ytaimbot_ml/quality/topic_blacklist.py` | M | T-200 |
+| T-921 | 🔲 | DisclaimerTemplates: AI дисклеймери для всіх ніш (Ghibli, Hype, Stories) | `src/ytaimbot_ml/niches/disclaimer_templates.py` | S | T-920 |
+| T-922 | 🔲 | VideoAssembler.add_disclaimer_frame(): 1-sec title card на початку відео | `modules/adapters/video/assembler.py` | M | T-300 |
+| T-923 | 🔲 | GhibliSEO: обов'язковий AI дисклеймер в generate_description() | `src/ytaimbot_ml/niches/ghibli_seo.py` | S | T-921 |
+| T-924 | 🔲 | BayesQualityFilter: інтеграція TopicBlacklist → fail-closed | `src/ytaimbot_ml/quality/bayes_filter.py` | M | T-920 |
+| T-925 | 🔲 | Pipeline: відео ≥ 8 хв валідація (не публікувати коротші без override) | `modules/orchestrator.py` | S | T-924 |
+| T-926 | 🔲 | ServiceQuotaTracker: додати "disclaimer_frames_added" лічильник | `src/ytaimbot_ml/quota/service_tracker.py` | S | T-922 |
+| T-927 | 🔲 | Тести: TopicBlacklist — 45 тригерів виявляються, безпечний текст проходить | `tests/unit/test_topic_blacklist.py` | M | T-920 |
+| T-928 | 🔲 | Тести: GhibliSEO — опис містить дисклеймер, рік, "18+" | `tests/unit/test_disclaimer_in_seo.py` | S | T-923 |
+| T-929 | 🔲 | Тести: VideoAssembler — disclaimer_frame змонтовано на початку | `tests/unit/test_disclaimer_frame.py` | S | T-922 |
+| T-930 | 🔲 | E2E: pipeline.run(dry_run=True) → ComplianceReport містить is_safe=True | `tests/e2e/test_compliance_e2e.py` | M | T-924, T-922 |
+
+### Acceptance для Phase P12
+
+- [ ] Кожен запущений pipeline вставляє 1-сек дисклеймер-кадр (перевірено тестом)
+- [ ] Кожен згенерований опис містить AI-дисклеймер (рік + "18+" + "fictional")
+- [ ] TopicBlacklist блокує всі 45+ заборонених тем
+- [ ] BayesQualityFilter.decide() повертає "fail" якщо TopicBlacklist.is_safe() == False
+- [ ] Pipeline не публікує відео коротше 8 хвилин без явного override
+- [ ] CTR ціль оновлено до 8–14% у всіх SEO-компонентах
+
+---
+
+═══════════════════════════════════════════════════════════════════
+## 🔥 PHASE P13: HYPE NICHES — HYPE CHARACTERS + AI STORIES — 🔲 PLANNED
+═══════════════════════════════════════════════════════════════════
+
+**Ціль:** Додати 2 перевірені ніші з задокументованим доходом ($20k/2 міс). Паралельно з Ghibli ASMR для диверсифікації.
+
+**Залежності:** P12 (Anti-Demonetization — ОБОВЯЗКОВО першим), P2, P3
+
+**Пріоритет:** 🔴 High — ніші монетизуються за 2 тижні (проти 2–3 місяців у класичних нішах)
+
+### 📊 ПОРІВНЯННЯ НОВИХ НІШИХ
+
+| Ніша | RPM | Перегляди | Монетизація | Складність | Автоматизація |
+|------|-----|-----------|-------------|-----------|---------------|
+| 🔥 **Hype Characters** | $1.5–2 | 1.5M–3M/відео | 2 тижні | Низька | 95% |
+| 📖 **AI Stories** | $2–5 | 300k–800k/відео | 3–4 тижні | Середня | 90% |
+| 🌸 Ghibli ASMR | $3–5 | 100k–500k/відео | 5 днів–1 міс | Середня | 85% |
+
+### 🔥 НІША 1: HYPE CHARACTERS (Trendy Animated Characters)
+
+**Стратегія (задокументовано: 1.6M–2.9M переглядів/відео):**
+1. Знайди trending персонажа (Zootopia 2, Skibidi Toilet, нові Pixar/Disney)
+2. Знайди відео з будь-якої ніші з 3M+ переглядів → візьми структуру сюжету
+3. Заміни персонажів на trending → збережи структуру
+4. Анімація: Kling AI (найкраще для аніме/cartoon) — **НЕ Veo3** (погано для мультфільмів)
+5. Музика: Suno AI (генерація тематичної музики) → MP3 → в відео
+6. Тривалість: **≥ 8 хвилин** (більше mid-roll реклами)
+7. Thumbnail: шоковане обличчя + сльози + червоні стрілки (документований CTR 10–14%)
+
+**Де знайти trending персонажів:**
+- YouTube канал "D-Second" — відстежує всі хайпи
+- Google Trends → категорія "Animated characters"
+- TikTok trending → те що з TikTok перетікає на YouTube через 2–4 тижні
+- YouTube Trending (UA/EN) → фільтр "Анімація"
+
+**Заборонені теми для цієї ніші:**
+- НЕ використовувати дітей/підлітків у романтичних сюжетах
+- НЕ копіювати більше 10% оригінального відео (copyright)
+- НЕ використовувати офіційну музику → тільки Suno AI або Pixabay
+
+### 📖 НІША 2: AI STORIES (Narrated Stories з AI-голосом)
+
+**Стратегія:**
+1. LLM (Groq) генерує сценарій (жахи / драма / детектив) ~1500 слів = 10 хв
+2. TTS Chain озвучує (ElevenLabs → edge-tts)
+3. AI-зображення як фон (Stable Diffusion / Imagen)
+4. Монтаж: фон + голос + субтитри + Suno AI музика
+5. RPM вище ($2–5) бо аудиторія 18+ = дорожча реклама
+
+**Структура відео (доведена для утримання ≥ 70%):**
+```
+00:00–00:30 — Hook: шокуюча перша фраза ("You wake up and everything is wrong...")
+00:30–02:30 — Setup: персонажі, місце дії
+02:30–05:30 — Конфлікт: наростання напруги
+05:30–07:30 — Twist: несподіваний поворот
+07:30–09:30 — Кульмінація: пік емоції
+09:30–10:00 — Розв'язка: мораль/закінчення
+```
+
+### 🎵 SUNO AI — МУЗИЧНИЙ АДАПТЕР
+
+**Стратегія:** Suno безкоштовний рівень = 50 пісень/день. Генерує тематичну музику для відео.
+- `modules/adapters/audio/suno.py` — HTTP adapter до Suno API
+- Fallback: Pixabay Audio API (безкоштовно, commercial OK)
+- Жанри: ambient/ASMR (Ghibli), epic/dramatic (Stories), pop/anime (Hype)
+
+### Таблиця задач Phase P13
+
+| ID | Статус | Задача | Файл(и) | Склад. | Залежить від |
+|----|--------|--------|---------|--------|-------------|
+| T-940 | 🔲 | HypeCharactersProfile: профіль ніші, шаблони сюжетів, SEO | `src/ytaimbot_ml/niches/hype_characters.py` | M | T-920 |
+| T-941 | 🔲 | TrendingCharacterFetcher: моніторинг trending персонажів з Google Trends | `src/ytaimbot_ml/niches/trend_character_fetcher.py` | L | T-030 |
+| T-942 | 🔲 | HypeVideoIdeaGenerator: адаптація сюжетів для trending персонажів | `src/ytaimbot_ml/niches/hype_idea_generator.py` | M | T-940 |
+| T-943 | 🔲 | HypeSEO: CTR-оптимізовані заголовки + емодзі + шаблони thumbnail | `src/ytaimbot_ml/niches/hype_seo.py` | M | T-940 |
+| T-944 | 🔲 | AIStoriesProfile: профіль ніші жахи/драма, структура 6 актів | `src/ytaimbot_ml/niches/ai_stories.py` | M | T-920 |
+| T-945 | 🔲 | StoryScriptGenerator: Groq LLM → структурований сценарій 1500 слів | `src/ytaimbot_ml/niches/story_script_generator.py` | L | T-082, T-944 |
+| T-946 | 🔲 | SunoAdapter: генерація тематичної музики через Suno API | `modules/adapters/audio/suno.py` | M | T-006 |
+| T-947 | 🔲 | AudioChain: Suno → Pixabay → edge-music fallback (Chain of Responsibility) | `modules/adapters/audio/audio_chain.py` | M | T-946 |
+| T-948 | 🔲 | KlingAdapter: Kling AI аніматор (paid, optional, кращий результат) | `modules/adapters/video/kling.py` | L | T-300 |
+| T-949 | 🔲 | UCB1Bandit: додати HYPE_CHARACTERS та AI_STORIES як arm'и | `src/ytaimbot_ml/rl/ucb1_bandit.py` | S | T-940, T-944 |
+| T-950 | 🔲 | Тести: HypeCharactersProfile — title ≤ 100 символів, ≥ 15 тегів | `tests/unit/test_hype_characters.py` | M | T-940 |
+| T-951 | 🔲 | Тести: AIStoriesProfile — LLM prompt правильний, структура 6 актів | `tests/unit/test_ai_stories.py` | M | T-944 |
+| T-952 | 🔲 | Тести: SunoAdapter mock — повертає MP3 bytes | `tests/unit/test_suno_adapter.py` | M | T-946 |
+| T-953 | 🔲 | Тести: AudioChain — fallback на Pixabay при Suno quota exceeded | `tests/unit/test_audio_chain.py` | M | T-947 |
+| T-954 | 🔲 | E2E: HypeCharacters pipeline dry_run=True, seed=42 | `tests/e2e/test_hype_pipeline.py` | L | T-942, T-947, T-924 |
+
+### Acceptance для Phase P13
+
+- [ ] `HypeCharactersProfile.get_seo_title()` → ≤ 100 символів, емодзі, CTR-тригер
+- [ ] `AIStoriesProfile.get_llm_prompt()` → містить жанр, кількість слів, структуру 6 актів
+- [ ] `SunoAdapter` повертає MP3 при success, fallback на Pixabay при quota exceeded
+- [ ] `UCB1Bandit` обирає між Ghibli / Hype / Stories після 10 відео
+- [ ] Всі нові профілі містять `AI_DISCLAIMER` і мають захист від дем. тригерів
+- [ ] `TrendingCharacterFetcher` повертає ≥ 5 персонажів з hype_score ≥ 0.7
+
+---
+
+## 📊 ОНОВЛЕНИЙ ЗАГАЛЬНИЙ ПРОГРЕС (v2.2)
 
 | Фаза | Назва | Всього | ✅ Done | 🔲 Pending |
 |------|-------|--------|---------|-----------|
@@ -4191,12 +4361,37 @@ def bootstrap_ci(data: np.ndarray,
 | **P9** | Testing + Coverage | 50 | 0 | 50 |
 | **P10** | Docs + Finalization | 30 | 0 | 30 |
 | **P11** | 🌸 Ghibli ASMR Pipeline | 15 | 0 | 15 |
+| **P12** | 🛡️ Anti-Demonetization | 11 | 0 | 11 |
+| **P13** | 🔥 Hype Niches (Characters + Stories + Suno) | 15 | 0 | 15 |
 | **SUPP A–F** | Algorithms (Aho-Corasick, Kalman, ARIMA, MC, GNB, PageRank) | 30 | 0 | 30 |
 | **SUPP G–J** | Algorithms (Greedy, Dijkstra, DSU, BIT, SA, Newton, MCTS, Bootstrap) | 47 | 0 | 47 |
-| **TOTAL** | | **702** | **15** | **687** |
+| **TOTAL** | | **728** | **15** | **713** |
+
+---
+
+## 📈 МЕТРИКИ УСПІХУ (оновлено v2.2)
+
+> ⚠️ Оновлено на основі реальних даних каналів $20k/2 місяці (2025–2026)
+
+| Метрика | Мінімум | Ціль (оновлено) | Вимір |
+|---------|---------|------|-------|
+| **CTR** | ≥ 6% | ≥ 8–14% | YouTube Studio |
+| **Retention 30s** | ≥ 60% | ≥ 70% | YouTube Analytics |
+| **Довжина відео** | ≥ 5 хв | **≥ 8 хв** (більше mid-roll) | VideoAssembler validation |
+| **Upload cadence** | 1/3 дні | 1/день | Автоматично |
+| **Test coverage** | ≥ 80% | ≥ 90% | pytest --cov |
+| **Uptime** | ≥ 99% | ≥ 99.9% | Hetzner monitor |
+| **Processing time** | ≤ 10 хв | ≤ 5 хв | logs |
+| **Revenue** | $1k/міс | $5k+/міс | AdSense |
+| **Bayes precision** | ≥ 80% | ≥ 95% | test_bayes_filter |
+| **Trend overlap** | ≥ 80% | ≥ 95% | test_trend_analyzer |
+| **Build time CI** | ≤ 3 хв | ≤ 2 хв | GitHub Actions |
+| **Demonetization rate** | ≤ 5% | **0%** | YouTube Studio |
+| **Disclaimer compliance** | 100% | **100%** | TopicBlacklist audit |
 
 ---
 
 *Цей файл автоматично оновлюється AI агентом після виконання кожної задачі.*
 *Версія 2.0 — доповнено алгоритмами: Aho-Corasick, Kalman Filter, ARIMA, Monte Carlo, Gaussian NB, PageRank, HyperLogLog, Edit Distance (2026-03-10)*
 *Версія 2.1 — 🌸 Додано: ніша Ghibli-style ASMR, Phase P11 (T-900–T-914), SEO стратегія, CharacterRegistry, KenBurns, SeasonalBoost. Чесний аналіз монетизації. (2026-03-11)*
+*Версія 2.2 — 🛡️ Додано: Phase P12 Anti-Demonetization (T-920–T-930), Phase P13 Hype Niches (T-940–T-954). Оновлено CTR ціль → 8–14%, відео ≥ 8 хв, Suno AI адаптер, HypeCharacters, AIStories. (2026-03-11)*
