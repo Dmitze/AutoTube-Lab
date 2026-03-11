@@ -1,6 +1,6 @@
 # 🤖 YTAIMBot — AI Agent Master Roadmap (500+ Tasks)
 
-> **Версія:** 1.0.0 | **Оновлено:** 2026-03-10 | **Статус:** В розробці
+> **Версія:** 2.0.0 | **Оновлено:** 2026-03-11 | **Статус:** В розробці — Free-Tier Cloud Architecture
 > **Ціль проєкту:** Автономний YouTube-конвеєр контенту → $5k+/місяць
 
 ---
@@ -33,14 +33,37 @@ RULE-07: Кожен новий адаптер ПОВИНЕН реалізову�
 RULE-08: Determinism is mandatory — будь-який ML компонент приймає np.random.Generator
 RULE-09: Fail-closed publishing — публікація ТІЛЬКИ якщо ComplianceReport.decision == "pass"
 RULE-10: Логуй через stdlib logging — DEBUG для даних, INFO для переходів, ERROR для збоїв
-RULE-11: ⭐ БЮДЖЕТ = $0 — використовуй ТІЛЬКИ безкоштовні ліміти/токени. НІКОЛИ не додавай платні API/сервіси.
-          Пріоритет LLM:   Groq (14 400 req/day) → Gemini Flash (1 500/day) → Ollama (self-hosted optional)
-          Пріоритет TTS:   edge-tts (∞, no key) → ElevenLabs (10k/month) → Gemini TTS (1M/day) → TTSMaker (20k/week)
-          Пріоритет відео: Стокові кадри Pexels/Pixabay API → CapCut AI (web) → Kling/Veo (web, manual)
-          Пріоритет хмари: GitHub Actions ($0, 2000 min/month) → Railway free → Oracle Cloud Free ARM VM
-RULE-12: LLM на хмарі — Ollama НЕ є primary. Використовуй Groq або Gemini Flash API (REST, без локального сервера).
-RULE-13: ServiceQuotaTracker (data/quota.db) — ЗАВЖДИ перевіряй ліміти ПЕРЕД викликом платного/лімітованого сервісу.
-          Якщо check_available() → False, переходь до наступного сервісу в ланцюжку (Chain of Responsibility).
+RULE-11: ⭐ СТРАТЕГІЯ СЕРВІСІВ — Free-First з авто-перемиканням.
+          Дозволені: сервіси з безкоштовним рівнем (навіть якщо є платні плани).
+          Заборонені: будь-які виклики що списують гроші ($0 бюджет до монетизації).
+
+          Алгоритм вибору сервісу (Chain of Responsibility):
+          1. Перевір ServiceQuotaTracker → check_available(service, chars)
+          2. Якщо True  → викликай сервіс, consume(service, chars)
+          3. Якщо False → переходь до наступного в ланцюжку (пріоритет ↓ = гірша якість)
+          4. Якщо всі вичерпано → edge-tts/template (∞ fallback, завжди є)
+
+          Пріоритет LLM:   Groq (14 400 req/day FREE) → Gemini Flash (1 500/day FREE) → Ollama (self-hosted, optional)
+          Пріоритет TTS:   ElevenLabs (10k/month) → Gemini TTS (1M/day) → TTSMaker (20k/week) → edge-tts (∞, NO KEY)
+          Пріоритет відео: Pexels/Pixabay стоки (API, commercial OK) → MoviePy assembly → plain slides
+          Пріоритет хмари: GitHub Actions (2000 min/month FREE) → Railway free tier → Oracle Cloud Always-Free ARM
+
+RULE-12: ❌ НЕ ЛОКАЛЬНО — Ollama не є primary LLM. Код деплоїться в хмарі де немає GPU.
+          Primary LLM = Groq API (REST, 14 400 req/day FREE, llama-3.1-8b-instant).
+          Ollama = optional self-hosted на Oracle Cloud Always-Free ARM VM (4 OCPU, 24GB RAM).
+          Якщо LLM_PROVIDER не задано → автоматично обирай Groq.
+
+RULE-13: ServiceQuotaTracker (data/quota.db) — ЗАВЖДИ перевіряй ПЕРЕД викликом.
+          Файл: src/ytaimbot_ml/quota/service_tracker.py
+          API:  tracker.check_available(service_id, amount) → bool
+                tracker.consume(service_id, amount)
+                tracker.remaining(service_id) → int  (-1 = unlimited)
+          Правило: unlimited services (edge-tts, Pexels) ніколи не блокуються.
+
+RULE-14: ЯКІСТЬ ПЕРШ ЗА ВСЕ — порядок пріоритетів = від найкращої якості до гіршої.
+          Навіть якщо Groq безкоштовний — він дає кращий результат ніж edge-tts.
+          FreeTierTTSChain: ElevenLabs (найкраща якість голосу) → ... → edge-tts (гарантований fallback).
+          Мета: максимальна якість відео при $0 витрат.
 ```
 
 ### Алгоритм вибору наступної задачі
@@ -121,37 +144,57 @@ class Task:
 
 ---
 
-## 🆓 FREE-TIER СЕРВІСИ (RULE-11)
+## 🆓 FREE-TIER СЕРВІСИ — ДОЗВОЛЕНІ СЕРВІСИ (RULE-11)
 
-> **Ніколи не використовувати платні сервіси.** Нижче — всі дозволені сервіси з лімітами.
+> **Концепція:** Можна використовувати БУДЬ-які сервіси (навіть платні) якщо у них є безкоштовний рівень.
+> Додаток **автоматично** використовує безкоштовні квоти і перемикається на наступний сервіс при вичерпанні.
+> Гроші НЕ списуються — ServiceQuotaTracker блокує будь-який виклик понад free-tier.
 
-### LLM (мозок агента)
-| Сервіс | Ліміт (безкоштовно) | Адаптер | Пріоритет |
-|--------|---------------------|---------|-----------|
-| Groq API | 14 400 req/день, llama-3.1-8b | `modules/adapters/llm/groq.py` | 1 (primary) |
-| Google Gemini Flash | 1 500 req/день, 1M tokens/день | `modules/adapters/llm/gemini.py` | 2 |
-| Ollama (self-hosted) | ∞ (потрібен ARM VPS) | `modules/adapters/llm/ollama.py` | 3 (optional) |
+### 🧠 LLM — мозок агента (генерація скриптів, SEO, ідеї)
+| # | Сервіс | Безкоштовний ліміт | Якість | Адаптер | Реєстрація |
+|---|--------|-------------------|--------|---------|-----------|
+| 1 | **Groq API** | 14 400 req/день, 6k tokens/req | ⭐⭐⭐⭐⭐ | `modules/adapters/llm/groq.py` | console.groq.com |
+| 2 | **Google Gemini Flash** | 1 500 req/день, 1M tokens/день | ⭐⭐⭐⭐ | `modules/adapters/llm/gemini.py` | aistudio.google.com |
+| 3 | **Ollama** (self-hosted) | ∞ (потрібен ARM VPS) | ⭐⭐⭐ | `modules/adapters/llm/ollama.py` | ollama.com (optional) |
 
-### TTS (озвучка) — Chain of Responsibility
-| Сервіс | Ліміт | Адаптер | Пріоритет |
-|--------|-------|---------|-----------|
-| ElevenLabs | 10 000 символів/місяць | `modules/adapters/tts/elevenlabs.py` | 1 |
-| Google Gemini TTS | ~1 000 000 символів/день | `modules/adapters/tts/gemini_tts.py` | 2 |
-| TTSMaker | 20 000 символів/тиждень | `modules/adapters/tts/ttsmaker.py` | 3 |
-| edge-tts (Microsoft) | **∞ безлімітно** (без ключа) | вбудовано в chain | 4 (fallback) |
+### 🎙️ TTS — озвучка відео (Chain of Responsibility, авто-перемикання)
+| # | Сервіс | Безкоштовний ліміт | Якість голосу | Адаптер | Реєстрація |
+|---|--------|-------------------|--------------|---------|-----------|
+| 1 | **ElevenLabs** | 10 000 символів/місяць | ⭐⭐⭐⭐⭐ (найкращий) | `modules/adapters/tts/elevenlabs.py` | elevenlabs.io |
+| 2 | **Google Gemini TTS** | ~1 000 000 символів/день | ⭐⭐⭐⭐ | `modules/adapters/tts/gemini_tts.py` | aistudio.google.com |
+| 3 | **TTSMaker** | 20 000 символів/тиждень | ⭐⭐⭐ | `modules/adapters/tts/ttsmaker.py` | ttsmaker.com |
+| 4 | **edge-tts** (Microsoft) | **∞ безлімітно** (без ключа!) | ⭐⭐ (гарантований fallback) | вбудовано в chain | — |
 
-### Відео (стоки)
-| Сервіс | Ліміт | Адаптер | Пріоритет |
-|--------|-------|---------|-----------|
-| Pexels API | 200 req/год, 20 000/місяць | `modules/adapters/video/pexels.py` | 1 |
-| Pixabay API | 100 req/хв, 5 000/день | вбудовано в PexelsStockAdapter | 2 |
+> ⚡ `FreeTierTTSChain` (`modules/adapters/tts/free_tier_chain.py`) управляє цим ланцюжком автоматично.
 
-### Хмарний деплой
-| Платформа | Ліміт | Використання |
-|-----------|-------|--------------|
-| GitHub Actions | 2 000 хв/місяць безкоштовно | Основний пайплайн (cron щоденно) |
-| Oracle Cloud Free | 4 OCPU, 24GB RAM ARM VM | Ollama (якщо потрібен) |
-| Railway.app | $5 кредитів/місяць безкоштовно | Резерв |
+### 🎬 Стокове відео (Pexels + Pixabay — commercial use OK)
+| # | Сервіс | Безкоштовний ліміт | Адаптер |
+|---|--------|-------------------|---------|
+| 1 | **Pexels API** | 200 req/год, 20 000/місяць, commercial OK | `modules/adapters/video/pexels.py` |
+| 2 | **Pixabay API** | 100 req/хв, 5 000/день, commercial OK | вбудовано в PexelsStockAdapter |
+
+> 📝 AI-генерація відео (Kling, Veo, Pika) — тільки через браузер вручну, НЕ автоматизується (немає публічного API).
+
+### ☁️ Хмарний деплой
+| # | Платформа | Безкоштовний ліміт | Використання |
+|---|-----------|-------------------|--------------|
+| 1 | **GitHub Actions** | 2 000 хв/місяць FREE | Основний щоденний cron-пайплайн |
+| 2 | **Oracle Cloud Always-Free** | 4 OCPU, 24GB RAM (ARM VM) | Опційно: Ollama LLM сервер |
+| 3 | **Railway.app** | $5 кредитів/місяць FREE | Резерв для webhook/API |
+
+### 📊 Ліміти ServiceQuotaTracker (data/quota.db)
+```python
+# Попередньо завантажені сервіси (src/ytaimbot_ml/quota/service_tracker.py)
+SERVICE_DEFAULTS = {
+    "edge-tts":    {"limit": -1,         "period_days": 1},   # ∞ unlimited
+    "elevenlabs":  {"limit": 10_000,     "period_days": 30},  # символи/місяць
+    "gemini-tts":  {"limit": 1_000_000,  "period_days": 1},   # символи/день
+    "ttsmaker":    {"limit": 20_000,     "period_days": 7},   # символи/тиждень
+    "groq-llm":    {"limit": 14_400,     "period_days": 1},   # req/день
+    "gemini-llm":  {"limit": 1_500,      "period_days": 1},   # req/день
+    "pexels":      {"limit": 200,        "period_days": 1},   # req/год → не обмежуємо
+}
+```
 
 ---
 
@@ -354,32 +397,33 @@ YTAIMBot/
 
 ---
 
-## 🏗️ АРХІТЕКТУРА КОНВЕЄРА (7 СТАДІЙ)
+## 🏗️ АРХІТЕКТУРА КОНВЕЄРА (12 СТАДІЙ — CLOUD FREE-TIER)
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    YTAIMBOT PIPELINE v1.0                       │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  STAGE 1        STAGE 2         STAGE 3        STAGE 4          │
-│  ┌─────────┐   ┌──────────┐   ┌─────────┐   ┌──────────┐      │
-│  │ INGEST  │──▶│FEATURIZE │──▶│ REDUCE  │──▶│  SCORE   │      │
-│  │         │   │          │   │ (SVD)   │   │ (L2 norm)│      │
-│  │Trend    │   │_featurize│   │Truncated│   │ sorted   │      │
-│  │Source   │   │()        │   │SVD(k=2) │   │ desc     │      │
-│  │Adapter  │   │np.array  │   │         │   │          │      │
-│  └─────────┘   └──────────┘   └─────────┘   └──────────┘      │
-│                                                                 │
-│  STAGE 5        STAGE 6         STAGE 7                         │
-│  ┌─────────┐   ┌──────────┐   ┌─────────┐                      │
-│  │  PLAN   │──▶│   GATE   │──▶│ PUBLISH │                      │
-│  │         │   │(Bayesian)│   │(fail-   │                      │
-│  │top-5    │   │P(bad|f)  │   │closed)  │                      │
-│  │Content  │   │threshold │   │         │                      │
-│  │Plans    │   │= 0.5     │   │DRY_RUN  │                      │
-│  └─────────┘   └──────────┘   └─────────┘                      │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│              YTAIMBOT PIPELINE v2.0 — CLOUD FREE-TIER                │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  [1] INGEST      [2] FEATURIZE    [3] SVD        [4] SCORE           │
+│  TrendSource  →  _featurize()  →  Truncated   →  L2 norm            │
+│  Google/YT/       np.array        SVD(k=2)       sorted desc        │
+│  Composite                                                           │
+│                                                                      │
+│  [5] PLAN        [6] GATE         [7] SCRIPT     [8] AUDIO           │
+│  top-5 →      →  BayesFilter   →  GroqLLM     →  FreeTierTTS        │
+│  ContentPlan      P(bad)<0.5       Gemini FB      Chain:            │
+│                   decision         Ollama opt     ElevenLabs→       │
+│                                                   GeminiTTS→        │
+│                                                   TTSMaker→         │
+│                                                   edge-tts(∞)       │
+│                                                                      │
+│  [9] VIDEO       [10] UPLOAD      [11] ANALYTICS [12] FEEDBACK       │
+│  Pexels stk   →  YouTube       →  EMA tracker →  UCB1 Bandit        │
+│  MoviePy asm     OAuth2 res.      KPI gate        reward ← CTR      │
+│  subtitle+tn     QuotaGuard       CTR/retention   re-rank trends    │
+│                  (fail-closed)                                       │
+└──────────────────────────────────────────────────────────────────────┘
+  ⚡ ServiceQuotaTracker (data/quota.db) захищає ВСІ стадії 7,8,9,10
 ```
 
 **Алгоритми в конвеєрі:**
@@ -387,7 +431,12 @@ YTAIMBot/
 - **Stage 3:** TruncatedSVD → `O(min(n,d) × n × d)` де `n` = сигнали
 - **Stage 4:** L2 norm → `O(n×k)`, сортування `O(n log n)` (QuickSort в NumPy)
 - **Stage 6:** Naive Bayes → `O(n_features)` per sample
-- **Stage 7:** Fail-closed gate → `O(1)` decision check
+- **Stage 7:** LLM Chain → Chain of Responsibility `O(k)` де k = провайдери
+- **Stage 8:** TTS Chain → Chain of Responsibility `O(k)` де k = TTS сервіси
+- **Stage 9:** Video assembly → `O(frames × pixels)` (MoviePy FFmpeg)
+- **Stage 10:** Token Bucket quota → `O(1)` per check
+- **Stage 11:** EMA tracker → `O(1)` per update
+- **Stage 12:** UCB1 Bandit → `O(k)` select, `O(1)` update
 
 ---
 
@@ -693,21 +742,25 @@ LRUCache(capacity=128, ttl_seconds=900):
 
 ---
 
-### 📌 EPIC 2.1 — LLM Adapter (Ollama на VPS або Groq API)
+### 📌 EPIC 2.1 — LLM Adapter Chain (Groq → Gemini → Ollama)
 
-> **AI агенте:** Два варіанти LLM — обидва працюють у ХМАРІ (локальний ПК не потрібен).
+> **AI агенте:** LLM повністю хмарний. Ollama НЕ є primary (RULE-12).
 >
-> **Варіант A (Рекомендовано): Groq API** — безкоштовний хмарний LLM, 14K req/день.
->   - Швидше ніж Ollama, не навантажує VPS RAM
->   - `LLM_PROVIDER=groq`, `GROQ_API_KEY=gsk_...`
->   - Модель: `llama-3.1-8b-instant` або `gemma2-9b-it`
+> **Ланцюжок LLM (Chain of Responsibility + ServiceQuotaTracker):**
+> ```
+> LLMChain:
+>   1. GroqAdapter      → check_available("groq-llm", 1)  — 14 400 req/день FREE
+>   2. GeminiAdapter    → check_available("gemini-llm", 1) — 1 500 req/день FREE
+>   3. OllamaAdapter    → якщо OLLAMA_URL задано (optional self-hosted)
+>   4. TemplateOnlyGen  → fallback без LLM (якщо всі недоступні)
+> ```
 >
-> **Варіант B: Ollama на тому ж VPS** — потрібно 4GB+ RAM (Hetzner CX32, €5.77/міс).
->   - `OLLAMA_URL=http://ollama:11434` (docker-compose service)
->   - Модель: `llama3.2:3b` (мала модель, поміщається в 4GB)
+> **Файли вже створені в Phase 5b:**
+> - `modules/adapters/llm/groq.py` → GroqAdapter (✅ реалізовано)
+> - `modules/adapters/llm/gemini.py` → GeminiAdapter (✅ реалізовано)
+> - `modules/adapters/llm/__init__.py` → build_llm_adapter() factory (✅ реалізовано)
 >
-> **Пріоритет реалізації:** спочатку Groq (простіше), потім Ollama як fallback.
-> Використовуй `httpx` для HTTP викликів. Token budget guard обов'язковий.
+> **Для Phase 2 потрібно:** Інтегрувати LLM chain у ScriptGenerator, написати тести.
 
 **Алгоритм Token Budget (Dynamic Programming):**
 ```
@@ -719,8 +772,6 @@ token_budget_dp(sections: list[str], max_tokens: int) -> list[int]:
     """
     n = len(sections)
     weights = [estimate_tokens(s) for s in sections]
-    # Knapsack-like: кожна секція ПОВИННА бути включена,
-    # але можна скорочувати (min_ratio = 0.5)
     total = sum(weights)
     if total <= max_tokens:
         return weights  # все поміщається
@@ -728,39 +779,30 @@ token_budget_dp(sections: list[str], max_tokens: int) -> list[int]:
     return [max(int(w * scale), int(w * 0.5)) for w in weights]
 ```
 
-**Fallback Chain для LLM (cloud-first):**
-```
-LLMFallbackChain:
-  1. GroqAdapter (api.groq.com — безкоштовно)  → якщо недоступний або ключ відсутній
-  2. OllamaAdapter (http://ollama:11434 на VPS) → якщо Ollama не запущений
-  3. TemplateOnlyGenerator                      → якщо шаблони не підходять
-  4. raise ContentGenerationError               → fail loudly
-```
-
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-081 | 🔲 | Додати `httpx` до pyproject.toml | `pyproject.toml` | S | T-001 | — |
-| T-082 | 🔲 | Визначити `LLMAdapter` ABC у base.py | `modules/adapters/base.py` | S | T-006 | — |
-| T-083 | 🔲 | Створити `GroqAdapter` клас (cloud LLM — основний) | `modules/adapters/llm_groq.py` | M | T-082 | — |
-| T-084 | 🔲 | Реалізувати `generate(prompt, model, max_tokens)` → str | `modules/adapters/llm_groq.py` | L | T-083 | — |
-| T-085 | 🔲 | Реалізувати `health_check()` → bool (ping Groq API) | `modules/adapters/llm_groq.py` | S | T-083 | — |
-| T-086 | 🔲 | Реалізувати token budget guard (обрізає prompt якщо > ліміт) | `modules/adapters/llm_groq.py` | M | T-084 | — |
-| T-087 | 🔲 | Реалізувати `OllamaAdapter` (VPS fallback, http://ollama:11434) | `modules/adapters/llm_local.py` | M | T-082 | — |
-| T-088 | 🔲 | Реалізувати `LLMFallbackChain` (Groq → Ollama → Template) | `modules/adapters/llm_local.py` | M | T-083, T-087 | — |
-| T-089 | 🔲 | Додати `@retry` до HTTP викликів | `modules/adapters/llm_groq.py` | S | T-017, T-084 | — |
-| T-090 | 🔲 | Зчитувати `LLM_PROVIDER`, `GROQ_API_KEY`, `OLLAMA_URL` з env vars | `modules/adapters/llm_groq.py` | S | T-083 | — |
-| T-091 | 🔲 | Написати тести (mock httpx.AsyncClient) | `tests/test_llm_adapter.py` | M | T-083 | — |
-| T-092 | 🔲 | Тест: generate() повертає непорожній string | `tests/test_llm_adapter.py` | S | T-091 | — |
-| T-093 | 🔲 | Тест: Groq недоступний → fallback до OllamaAdapter | `tests/test_llm_adapter.py` | M | T-091 | — |
-| T-094 | 🔲 | Тест: token budget guard обрізає довгий prompt | `tests/test_llm_adapter.py` | M | T-091 | — |
-| T-095 | 🔲 | Тест: GROQ_API_KEY читається з env var | `tests/test_llm_adapter.py` | S | T-091 | — |
+| T-081 | ✅ | Додати `httpx` до pyproject.toml | `pyproject.toml` | S | T-001 | 2026-W5 |
+| T-082 | ✅ | Визначити `LLMAdapter` ABC | `modules/adapters/base.py` | S | T-006 | 2026-W5 |
+| T-083 | ✅ | Створити `GroqAdapter` (cloud LLM primary — 14 400 req/day) | `modules/adapters/llm/groq.py` | M | T-082 | 2026-W5 |
+| T-084 | ✅ | Реалізувати `generate(prompt, model, max_tokens)` → str | `modules/adapters/llm/groq.py` | L | T-083 | 2026-W5 |
+| T-085 | ✅ | Реалізувати `health_check()` → bool | `modules/adapters/llm/groq.py` | S | T-083 | 2026-W5 |
+| T-086 | ✅ | Реалізувати token budget guard | `modules/adapters/llm/groq.py` | M | T-084 | 2026-W5 |
+| T-087 | ✅ | Реалізувати `GeminiAdapter` (2nd priority — 1 500 req/day) | `modules/adapters/llm/gemini.py` | M | T-082 | 2026-W5 |
+| T-088 | ✅ | Реалізувати `build_llm_adapter()` factory (Groq→Gemini→Ollama) | `modules/adapters/llm/__init__.py` | M | T-083, T-087 | 2026-W5 |
+| T-089 | ✅ | Додати `@retry` до HTTP викликів (429 retryable, 403 non-retryable) | `modules/adapters/llm/gemini.py` | S | T-017, T-084 | 2026-W5 |
+| T-090 | ✅ | Зчитувати `GROQ_API_KEY`, `GEMINI_API_KEY`, `OLLAMA_URL` з env | `.env.example` | S | T-083 | 2026-W5 |
+| T-091 | ✅ | Написати тести `test_free_tier_stack.py::TestGeminiAdapter` | `tests/unit/test_free_tier_stack.py` | M | T-083 | 2026-W5 |
+| T-092 | ✅ | Тест: generate() повертає непорожній string | `tests/unit/test_free_tier_stack.py` | S | T-091 | 2026-W5 |
+| T-093 | ✅ | Тест: 429 → RetryableError, 403 → NonRetryableError | `tests/unit/test_free_tier_stack.py` | M | T-091 | 2026-W5 |
+| T-094 | ✅ | Тест: відсутній API ключ → ValueError | `tests/unit/test_free_tier_stack.py` | S | T-091 | 2026-W5 |
+| T-095 | 🔲 | Реалізувати `OllamaAdapter` (optional self-hosted fallback) | `modules/adapters/llm/ollama.py` | M | T-082 | — |
 
 **Acceptance для EPIC 2.1:**
-- [ ] Реалізує `LLMAdapter` ABC
-- [ ] Groq API як основний провайдер (безкоштовно)
-- [ ] Ollama як fallback (якщо Groq недоступний)
-- [ ] Token budget guard обов'язковий
-- [ ] Fallback chain логується на рівні WARNING
+- [x] GroqAdapter та GeminiAdapter реалізовані та протестовані
+- [x] Fallback chain: Groq → Gemini → Ollama (якщо доступний)
+- [x] Token budget guard обов'язковий
+- [x] API ключі тільки з env vars (НІКОЛИ не хардкодити)
+- [ ] OllamaAdapter (optional, нижчий пріоритет)
 
 ---
 
@@ -802,35 +844,60 @@ def select_voice(lang: str, gender: str = "male") -> str:
 
 ---
 
-### 📌 EPIC 2.3 — TTS Fallback: Coqui TTS (локальний, офлайн)
+### 📌 EPIC 2.3 — FreeTierTTSChain (авто-перемикання між TTS сервісами)
 
-> **AI агенте:** Coqui TTS працює **повністю офлайн** — критично для Hetzner UA.
-> Це fallback коли Edge-TTS заблокований Microsoft.
-> CPU mode для MVP (GPU опційно через `USE_GPU=true` env var).
-> Модель: `tts_models/en/ljspeech/tacotron2-DDC` (найлегша, ~150MB).
+> **AI агенте:** Замість Coqui TTS (локального) використовуємо `FreeTierTTSChain` —
+> хмарний ланцюжок із 4 сервісів що АВТОМАТИЧНО перемикаються при вичерпанні квоти.
+>
+> **Файли вже реалізовані в Phase 5b:**
+> - `modules/adapters/tts/elevenlabs.py` → ElevenLabsTTSAdapter (✅)
+> - `modules/adapters/tts/gemini_tts.py` → GeminiTTSAdapter (✅)
+> - `modules/adapters/tts/ttsmaker.py` → TTSMakerAdapter (✅)
+> - `modules/adapters/tts/free_tier_chain.py` → FreeTierTTSChain (✅)
+> - `modules/adapters/tts/__init__.py` → build_tts_adapter() factory (✅)
+>
+> **Для Phase 2 потрібно:** Інтегрувати chain у Pipeline Stage 8, написати тести.
 
-**Fallback Chain для TTS:**
+**Логіка FreeTierTTSChain:**
 ```
-TTSFallbackChain:
-  1. EdgeTTSAdapter     → якщо Microsoft заблокував (ConnectionError)
-  2. CoquiTTSAdapter    → якщо модель не завантажена
-  3. raise TTSError     → fail loudly, зупинити pipeline
+FreeTierTTSChain.speak(text, output_path) → Path:
+
+  for (service_id, adapter) in chain:
+    1. pre_check: tracker.check_available(service_id, len(text))
+       → False: log WARNING "quota exhausted, trying next", continue
+    2. try:
+         path = adapter.speak(text, output_path)
+         tracker.consume(service_id, len(text))
+         return path                    # ← успіх, виходимо
+    3. except Exception as e:
+         log WARNING f"{service_id} failed: {e}, trying next"
+         continue
+
+  raise RuntimeError("all TTS services exhausted")
+  # edge-tts ЗАВЖДИ в кінці ланцюжку (∞) — RuntimeError не досягається
 ```
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-109 | 🔲 | Додати `TTS` (Coqui) до pyproject.toml як optional dep | `pyproject.toml` | S | T-001 | — |
-| T-110 | 🔲 | Створити `CoquiTTSAdapter` клас | `modules/adapters/tts_local.py` | M | T-097 | — |
-| T-111 | 🔲 | Реалізувати `synthesize(text, model, output_path)` → Path | `modules/adapters/tts_local.py` | L | T-110 | — |
-| T-112 | 🔲 | Реалізувати CPU mode (`use_gpu=False` за замовчуванням) | `modules/adapters/tts_local.py` | S | T-110 | — |
-| T-113 | 🔲 | Реалізувати lazy model loading (завантажуємо при першому виклику) | `modules/adapters/tts_local.py` | M | T-111 | — |
-| T-114 | 🔲 | Реалізувати `TTSFallbackChain` (Edge → Coqui → Error) | `modules/adapters/tts_local.py` | M | T-098, T-110 | — |
-| T-115 | 🔲 | Зберігати вихідний файл у `YTAIMBOT_DATA_DIR/audio/` | `modules/adapters/tts_local.py` | S | T-111 | — |
-| T-116 | 🔲 | Написати тести (mock TTS клас, пропускати якщо не встановлено) | `tests/test_tts_local.py` | M | T-110 | — |
-| T-117 | 🔲 | Тест: synthesize() повертає валідний шлях до .wav | `tests/test_tts_local.py` | S | T-116 | — |
-| T-118 | 🔲 | Тест: Edge-TTS fail → автоматичний fallback до Coqui | `tests/test_tts_local.py` | M | T-116 | — |
-| T-119 | 🔲 | Тест: lazy loading — модель не завантажується при імпорті | `tests/test_tts_local.py` | S | T-116 | — |
-| T-120 | 🔲 | Тест: USE_GPU=false → CPU mode активний | `tests/test_tts_local.py` | S | T-116 | — |
+| T-109 | ✅ | Реалізувати `ElevenLabsTTSAdapter` (10k/month) | `modules/adapters/tts/elevenlabs.py` | M | T-097 | 2026-W5 |
+| T-110 | ✅ | Реалізувати `GeminiTTSAdapter` (1M/day) | `modules/adapters/tts/gemini_tts.py` | M | T-097 | 2026-W5 |
+| T-111 | ✅ | Реалізувати `TTSMakerAdapter` (20k/week) з chunking | `modules/adapters/tts/ttsmaker.py` | M | T-097 | 2026-W5 |
+| T-112 | ✅ | Реалізувати `FreeTierTTSChain` з pre-check + fallback | `modules/adapters/tts/free_tier_chain.py` | L | T-109,T-110,T-111 | 2026-W5 |
+| T-113 | ✅ | Реалізувати `build_tts_adapter()` factory → FreeTierTTSChain | `modules/adapters/tts/__init__.py` | S | T-112 | 2026-W5 |
+| T-114 | ✅ | Реалізувати `quota_summary()` → dict (для моніторингу) | `modules/adapters/tts/free_tier_chain.py` | S | T-112 | 2026-W5 |
+| T-115 | ✅ | Написати тести `TestFreeTierTTSChain` (8 тестів) | `tests/unit/test_free_tier_stack.py` | M | T-112 | 2026-W5 |
+| T-116 | ✅ | Тест: перший сервіс використовується за замовчуванням | `tests/unit/test_free_tier_stack.py` | S | T-115 | 2026-W5 |
+| T-117 | ✅ | Тест: перший сервіс падає → fallback до другого | `tests/unit/test_free_tier_stack.py` | M | T-115 | 2026-W5 |
+| T-118 | ✅ | Тест: всі сервіси падають → RuntimeError | `tests/unit/test_free_tier_stack.py` | M | T-115 | 2026-W5 |
+| T-119 | ✅ | Тест: quota exhausted → сервіс пропускається | `tests/unit/test_free_tier_stack.py` | M | T-115 | 2026-W5 |
+| T-120 | 🔲 | Інтегрувати `FreeTierTTSChain` у Pipeline Stage 8 | `modules/orchestrator.py` | M | T-112,T-153 | — |
+
+**Acceptance для EPIC 2.3:**
+- [x] ElevenLabs → Gemini TTS → TTSMaker → edge-tts ланцюжок реалізовано
+- [x] ServiceQuotaTracker управляє квотами (data/quota.db)
+- [x] edge-tts ЗАВЖДИ в кінці (∞ fallback, ніколи не падає)
+- [x] Кожен адаптер реалізує `TTSAdapter` ABC
+- [ ] Pipeline Stage 8 використовує `FreeTierTTSChain`
 
 ---
 
@@ -935,19 +1002,21 @@ select_template(plan: ContentPlan, templates: list[Template]) -> Template:
 | T-152 | 🔲 | Додати `_generate_script()` стадію у Pipeline | `modules/orchestrator.py` | L | T-125, T-008 | — |
 | T-153 | 🔲 | Додати `_synthesize_audio()` стадію у Pipeline | `modules/orchestrator.py` | L | T-114, T-152 | — |
 | T-154 | 🔲 | Зберігати Script та audio path у PipelineResult | `modules/orchestrator.py` | M | T-151, T-152 | — |
-| T-155 | 🔲 | Додати `OLLAMA_MODEL`, `OLLAMA_URL` до .env.example | `.env.example` | S | T-083 | — |
-| T-156 | 🔲 | Додати `TTS_LANGUAGE`, `TTS_GENDER`, `USE_GPU` до .env.example | `.env.example` | S | T-100 | — |
+| T-155 | 🔲 | Додати `GROQ_API_KEY`, `GEMINI_API_KEY` до .env.example | `.env.example` | S | T-083 | — |
+| T-156 | 🔲 | Додати `TTS_LANGUAGE`, `TTS_GENDER`, `ELEVENLABS_API_KEY` до .env.example | `.env.example` | S | T-100 | — |
 | T-157 | 🔲 | Оновити docker-compose.yml з новими env vars | `docker-compose.yml` | S | T-155, T-156 | — |
 | T-158 | 🔲 | Написати інтеграційні тести Phase 2 Pipeline | `tests/test_orchestrator.py` | L | T-152, T-153 | — |
 | T-159 | 🔲 | Запустити `pytest -q --tb=short` → всі зелені | CI | S | T-158 | — |
 | T-160 | 🔲 | Перевірити coverage ≥ 80% для нових модулів | CI | S | T-159 | — |
 
 **Acceptance для PHASE 2 (загалом):**
-- [ ] LLM генерує скрипти ≥ 500 слів (з mock Ollama)
-- [ ] Edge-TTS → Coqui fallback chain працює
+- [ ] LLM генерує скрипти ≥ 500 слів (Groq API, mocked у тестах)
+- [ ] FreeTierTTSChain авто-перемикається: ElevenLabs→GeminiTTS→TTSMaker→edge-tts
+- [ ] ServiceQuotaTracker блокує перевитрату квот (data/quota.db)
 - [ ] Детермінізм: однаковий seed → однаковий скрипт
 - [ ] Шаблони обираються через cosine similarity
 - [ ] Pipeline зберігає `script_path` та `audio_path` у PipelineResult
+- [ ] Жодного виклику з реальним API у тестах (тільки mock)
 - [ ] `pytest -q` → всі тести зелені
 - [ ] Жодних реальних HTTP/LLM/TTS викликів у тестах
 
