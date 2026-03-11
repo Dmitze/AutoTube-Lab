@@ -1,0 +1,45 @@
+{
+  "__inputs": [],
+  "__requires": [{"type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0"}],
+  "title": "YTAIMBot Dashboard",
+  "uid": "ytaimbot-v1",
+  "version": 1,
+  "panels": [
+    {
+      "title": "Videos Published (Total)",
+      "type": "stat",
+      "targets": [{"expr": "ytaimbot_videos_published_total"}]
+    },
+    {
+      "title": "CTR EMA (target ≥ 6%)",
+      "type": "gauge",
+      "targets": [{"expr": "ytaimbot_ctr_ema"}],
+      "options": {"thresholds": {"steps": [
+        {"color": "red", "value": 0},
+        {"color": "yellow", "value": 0.04},
+        {"color": "green", "value": 0.06}
+      ]}}
+    },
+    {
+      "title": "30s Retention EMA (target ≥ 70%)",
+      "type": "gauge",
+      "targets": [{"expr": "ytaimbot_retention_ema"}],
+      "options": {"thresholds": {"steps": [
+        {"color": "red", "value": 0},
+        {"color": "yellow", "value": 0.50},
+        {"color": "green", "value": 0.70}
+      ]}}
+    },
+    {
+      "title": "YouTube Quota Used / 10000",
+      "type": "bar-gauge",
+      "targets": [{"expr": "ytaimbot_yt_quota_used"}]
+    },
+    {
+      "title": "Pipeline Duration (seconds)",
+      "type": "timeseries",
+      "targets": [{"expr": "ytaimbot_pipeline_duration_seconds"}]
+    }
+  ],
+  "_comment": "TODO: T-555 — finalize dashboard (Phase 7)"
+}

@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "ytaimbot"
+    static_configs:
+      - targets: ["bot:8000"]
+    metrics_path: /metrics
+
+  # TODO: T-554 — add alerting rules file reference
+  # rule_files:
+  #   - "alert_rules.yml"
