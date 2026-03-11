@@ -10,6 +10,10 @@ Selection logic:
   STORAGE_BACKEND=memory → InMemoryStorage
   STORAGE_BACKEND=sqlite → SQLiteStorage (YTAIMBOT_DATA_DIR/db/ytaimbot.db)
 
-Status: 🔲 Pending — T-431 (Phase 5, SQLite implementation)
+Status: ✅ SQLiteStorage done (Phase 5, T-431 through T-436)
          ✅ InMemoryStorage done (Phase 0, modules/adapters/synthetic.py)
 """
+
+from modules.adapters.storage.sqlite import SQLiteStorage
+
+__all__ = ["SQLiteStorage"]
