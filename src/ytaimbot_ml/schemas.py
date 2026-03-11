@@ -151,6 +151,164 @@ class Script:
 
 
 @dataclass
+class VideoAsset:
+    """Assembled video file produced by VideoAssembler.
+
+    Parameters
+    ----------
+    plan_id:
+        trend_id of the source ContentPlan.
+    video_path:
+        Absolute path to the MP4 file.
+    thumbnail_path:
+        Absolute path to the 1280×720 PNG thumbnail.
+    subtitle_path:
+        Absolute path to the SRT subtitle file (or empty string if none).
+    duration_seconds:
+        Video duration in seconds (0.0 if not yet assembled).
+    thumbnail_score:
+        ThumbnailScorer.score().total value in [0, 1].
+
+    Complexity
+    ----------
+    O(1) — pure data container
+    """
+
+    plan_id: str
+    video_path: str = ""
+    thumbnail_path: str = ""
+    subtitle_path: str = ""
+    duration_seconds: float = 0.0
+    thumbnail_score: float = 0.0
+
+    @property
+    def ready(self) -> bool:
+        """True if both video and thumbnail files are specified."""
+        return bool(self.video_path and self.thumbnail_path)
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 schemas — Publishing + Analytics
+# ---------------------------------------------------------------------------
+
+
+class PrivacyStatus:
+    """YouTube privacy status constants.
+
+    Values align with the YouTube Data API v3 ``status.privacyStatus`` field.
+
+    Examples
+    --------
+    >>> PrivacyStatus.UNLISTED
+    'unlisted'
+    >>> PrivacyStatus.PUBLIC
+    'public'
+    """
+
+    PRIVATE = "private"
+    UNLISTED = "unlisted"
+    PUBLIC = "public"
+
+
+@dataclass
+class UploadResult:
+    """Result of a successful YouTube video upload.
+
+    Parameters
+    ----------
+    plan_id:
+        trend_id of the source ContentPlan.
+    video_id:
+        YouTube video ID (e.g. ``"dQw4w9WgXcQ"``).
+    url:
+        Full watch URL (``https://youtu.be/{video_id}``).
+    privacy_status:
+        Current privacy status (``PrivacyStatus.*``).
+    quota_used:
+        YouTube API quota units consumed by this upload.
+    upload_time:
+        UTC timestamp when the upload completed.
+
+    Complexity
+    ----------
+    O(1) — pure data container
+
+    Examples
+    --------
+    >>> r = UploadResult(plan_id="t1", video_id="abc123", url="https://youtu.be/abc123")
+    >>> r.quota_used
+    1600
+    """
+
+    plan_id: str
+    video_id: str = ""
+    url: str = ""
+    privacy_status: str = PrivacyStatus.UNLISTED
+    quota_used: int = 1600
+    upload_time: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+
+    @property
+    def success(self) -> bool:
+        """True if a video_id was assigned."""
+        return bool(self.video_id)
+
+
+@dataclass
+class ChannelStats:
+    """Aggregated YouTube channel metrics for a single video.
+
+    Parameters
+    ----------
+    video_id:
+        YouTube video ID.
+    views:
+        Total view count.
+    ctr:
+        Click-through rate (impressions → clicks) in [0, 1].
+    retention_30s:
+        Percentage of viewers who watched past 30 seconds, in [0, 1].
+    likes:
+        Total like count.
+    comments:
+        Total comment count.
+    fetched_at:
+        UTC timestamp of the most recent analytics fetch.
+
+    Complexity
+    ----------
+    O(1) — pure data container
+
+    Examples
+    --------
+    >>> s = ChannelStats(video_id="abc", views=1000, ctr=0.07, retention_30s=0.72)
+    >>> s.ctr_pct
+    7.0
+    """
+
+    video_id: str
+    views: int = 0
+    ctr: float = 0.0
+    retention_30s: float = 0.0
+    likes: int = 0
+    comments: int = 0
+    fetched_at: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+
+    @property
+    def ctr_pct(self) -> float:
+        """CTR as a percentage (e.g. 0.07 → 7.0)."""
+        return round(self.ctr * 100, 2)
+
+    @property
+    def meets_targets(self) -> bool:
+        """True if CTR ≥ 6% and 30s retention ≥ 70% (pipeline KPIs)."""
+        return self.ctr >= 0.06 and self.retention_30s >= 0.70
+
+
+@dataclass
 class PipelineResult:
     """Aggregated result of a full pipeline run."""
 
@@ -159,5 +317,8 @@ class PipelineResult:
     plans: list[ContentPlan] = field(default_factory=list)
     compliance_reports: list[ComplianceReport] = field(default_factory=list)
     scripts: list[Script] = field(default_factory=list)
+    videos: list[VideoAsset] = field(default_factory=list)
+    uploads: list[UploadResult] = field(default_factory=list)
     status: str = "pending"  # "ok" | "blocked" | "error"
+
 
