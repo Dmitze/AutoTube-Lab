@@ -12,3 +12,38 @@ services:
       - YTAIMBOT_DRY_RUN=${YTAIMBOT_DRY_RUN:-true}
       - YTAIMBOT_SEED=${YTAIMBOT_SEED:-42}
       - YTAIMBOT_DATA_DIR=/app/data
+      # Phase 1: Trend adapters
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
+      - GOOGLE_TRENDS_GEO=${GOOGLE_TRENDS_GEO:-US}
+      - ADAPTER_WEIGHTS=${ADAPTER_WEIGHTS:-1.0,1.0}
+      - TREND_CACHE_TTL=${TREND_CACHE_TTL:-900}
+      # Phase 2: LLM
+      - LLM_PROVIDER=${LLM_PROVIDER:-groq}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-llama-3.1-8b-instant}
+      - TTS_LANGUAGE=${TTS_LANGUAGE:-uk}
+      - TTS_VOICE=${TTS_VOICE:-uk-UA-OstapNeural}
+
+  # Optional: local Ollama (uncomment if using local LLM on VPS with 4GB+ RAM)
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   profiles: ["ollama"]
+
+  # Optional: Monitoring stack (uncomment for Prometheus + Grafana)
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   volumes:
+  #     - ./scripts/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+  #   ports: ["9090:9090"]
+  #   profiles: ["monitoring"]
+  #
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   ports: ["3000:3000"]
+  #   profiles: ["monitoring"]
+
+volumes:
+  data:
