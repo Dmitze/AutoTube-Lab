@@ -33,6 +33,14 @@ RULE-07: Кожен новий адаптер ПОВИНЕН реалізову�
 RULE-08: Determinism is mandatory — будь-який ML компонент приймає np.random.Generator
 RULE-09: Fail-closed publishing — публікація ТІЛЬКИ якщо ComplianceReport.decision == "pass"
 RULE-10: Логуй через stdlib logging — DEBUG для даних, INFO для переходів, ERROR для збоїв
+RULE-11: ⭐ БЮДЖЕТ = $0 — використовуй ТІЛЬКИ безкоштовні ліміти/токени. НІКОЛИ не додавай платні API/сервіси.
+          Пріоритет LLM:   Groq (14 400 req/day) → Gemini Flash (1 500/day) → Ollama (self-hosted optional)
+          Пріоритет TTS:   edge-tts (∞, no key) → ElevenLabs (10k/month) → Gemini TTS (1M/day) → TTSMaker (20k/week)
+          Пріоритет відео: Стокові кадри Pexels/Pixabay API → CapCut AI (web) → Kling/Veo (web, manual)
+          Пріоритет хмари: GitHub Actions ($0, 2000 min/month) → Railway free → Oracle Cloud Free ARM VM
+RULE-12: LLM на хмарі — Ollama НЕ є primary. Використовуй Groq або Gemini Flash API (REST, без локального сервера).
+RULE-13: ServiceQuotaTracker (data/quota.db) — ЗАВЖДИ перевіряй ліміти ПЕРЕД викликом платного/лімітованого сервісу.
+          Якщо check_available() → False, переходь до наступного сервісу в ланцюжку (Chain of Responsibility).
 ```
 
 ### Алгоритм вибору наступної задачі
@@ -100,16 +108,50 @@ class Task:
 |------|-------|--------|---------|-----------|-----------|
 | **P0** | Foundation (Skeleton) | 15 | 15 | 0 | 0 |
 | **P1** | Real Trend Adapters | 65 | 65 | 0 | 0 |
-| **P2** | Content Generation | 80 | 0 | 0 | 80 |
-| **P3** | Video Assembly + SEO | 80 | 0 | 0 | 80 |
-| **P4** | Publishing Pipeline | 70 | 0 | 0 | 70 |
-| **P5** | Metrics Feedback Loop | 70 | 0 | 0 | 70 |
-| **P6** | RL Learner + Bandit | 60 | 0 | 0 | 60 |
+| **P2** | Content Generation | 80 | 80 | 0 | 0 |
+| **P3** | Video Assembly + SEO | 80 | 80 | 0 | 0 |
+| **P4** | Video Assembler Tests | 30 | 30 | 0 | 0 |
+| **P5** | Free-Tier Cloud Stack | 70 | 60 | 0 | 10 |
+| **P6** | Metrics + RL Bandit | 60 | 0 | 0 | 60 |
 | **P7** | Infrastructure + DevOps | 50 | 0 | 0 | 50 |
 | **P8** | Security + Compliance | 40 | 0 | 0 | 40 |
 | **P9** | Testing + Coverage | 50 | 0 | 0 | 50 |
 | **P10** | Docs + Finalization | 30 | 0 | 0 | 30 |
-| **TOTAL** | | **610** | **80** | **0** | **530** |
+| **TOTAL** | | **570** | **330** | **0** | **240** |
+
+---
+
+## 🆓 FREE-TIER СЕРВІСИ (RULE-11)
+
+> **Ніколи не використовувати платні сервіси.** Нижче — всі дозволені сервіси з лімітами.
+
+### LLM (мозок агента)
+| Сервіс | Ліміт (безкоштовно) | Адаптер | Пріоритет |
+|--------|---------------------|---------|-----------|
+| Groq API | 14 400 req/день, llama-3.1-8b | `modules/adapters/llm/groq.py` | 1 (primary) |
+| Google Gemini Flash | 1 500 req/день, 1M tokens/день | `modules/adapters/llm/gemini.py` | 2 |
+| Ollama (self-hosted) | ∞ (потрібен ARM VPS) | `modules/adapters/llm/ollama.py` | 3 (optional) |
+
+### TTS (озвучка) — Chain of Responsibility
+| Сервіс | Ліміт | Адаптер | Пріоритет |
+|--------|-------|---------|-----------|
+| ElevenLabs | 10 000 символів/місяць | `modules/adapters/tts/elevenlabs.py` | 1 |
+| Google Gemini TTS | ~1 000 000 символів/день | `modules/adapters/tts/gemini_tts.py` | 2 |
+| TTSMaker | 20 000 символів/тиждень | `modules/adapters/tts/ttsmaker.py` | 3 |
+| edge-tts (Microsoft) | **∞ безлімітно** (без ключа) | вбудовано в chain | 4 (fallback) |
+
+### Відео (стоки)
+| Сервіс | Ліміт | Адаптер | Пріоритет |
+|--------|-------|---------|-----------|
+| Pexels API | 200 req/год, 20 000/місяць | `modules/adapters/video/pexels.py` | 1 |
+| Pixabay API | 100 req/хв, 5 000/день | вбудовано в PexelsStockAdapter | 2 |
+
+### Хмарний деплой
+| Платформа | Ліміт | Використання |
+|-----------|-------|--------------|
+| GitHub Actions | 2 000 хв/місяць безкоштовно | Основний пайплайн (cron щоденно) |
+| Oracle Cloud Free | 4 OCPU, 24GB RAM ARM VM | Ollama (якщо потрібен) |
+| Railway.app | $5 кредитів/місяць безкоштовно | Резерв |
 
 ---
 

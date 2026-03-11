@@ -2,7 +2,7 @@
 
 # 🤖 YTAIMBot
 
-### Автономний YouTube контент-конвеєр на базі ML
+### Автономний YouTube контент-конвеєр — $0 на AI сервіси
 
 [![CI](https://github.com/Dmitze/YTAIMBot/actions/workflows/ci.yml/badge.svg)](https://github.com/Dmitze/YTAIMBot/actions)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://www.python.org)
@@ -10,12 +10,13 @@
 [![Coverage](https://img.shields.io/badge/coverage-80%25-yellowgreen)](https://github.com/Dmitze/YTAIMBot)
 [![Tasks](https://img.shields.io/badge/roadmap-640%20tasks-orange)](docs/ROADMAP_AI_AGENT_TASKS.md)
 [![Target](https://img.shields.io/badge/target-%245K%2B%2Fmonth-brightgreen)](docs/MONETIZATION_ANALYTICS_GUIDE.md)
+[![Cost](https://img.shields.io/badge/AI%20cost-%240%2Fmonth-blue)](docs/ROADMAP_AI_AGENT_TASKS.md)
 
-**Тренди → Сценарій → Озвучення → Відео → Публікація — повністю автоматично**
+**Тренди → Сценарій → Озвучення → Відео → Публікація — повністю автоматично і безкоштовно**
 
 [Roadmap (640 задач)](docs/ROADMAP_AI_AGENT_TASKS.md) •
 [Архітектура](#-архітектура) •
-[Швидкий старт](#-швидкий-старт) •
+[Безкоштовний старт](#-швидкий-старт-0) •
 [Алгоритми](#-алгоритми--структури-даних) •
 [Метрики](#-цільові-метрики)
 
@@ -23,20 +24,65 @@
 
 ---
 
-## 🎯 Що це таке
+## 💡 Концепція: $0 на AI
+
+> **Головне правило:** Всі AI-сервіси — тільки безкоштовні тарифи. Платимо тільки за хостинг — і тільки тоді, коли канал вже заробляє.
+
+```
+Ваш гаманець:  $0 на AI   →  Groq (free) + edge-tts (безлімітно) + Pexels (free)
+Хостинг:       $0 старт   →  GitHub Actions (free 2000 хв/місяць)
+               $4/міс     →  тільки коли канал вже монетизований
+```
+
+---
+
+## 🎯 Що робить бот
 
 **YTAIMBot** — повністю автономний конвеєр що:
 
-1. 🔍 **Знаходить** трендові теми (Google Trends + YouTube API)
-2. ✍️ **Генерує** відеосценарій через локальний LLM (Ollama)
-3. 🔊 **Озвучує** текст (Edge-TTS → Coqui TTS fallback, підтримка 🇺🇦 uk-UA)
-4. 🎬 **Монтує** відео (MoviePy + FFmpeg, 1080p/30fps)
-5. 🖼️ **Генерує** thumbnail (Pillow, 1280×720, CTR-оптимізований)
+1. 🔍 **Знаходить** трендові теми (Google Trends + YouTube API — обидва **безкоштовні**)
+2. ✍️ **Генерує** відеосценарій (Groq llama-3.1 **безкоштовно** → Gemini Flash **безкоштовно**)
+3. 🔊 **Озвучує** текст (edge-tts **∞ безлімітно** → ElevenLabs → TTSMaker — всі **безкоштовні**)
+4. 🎬 **Монтує** відео (MoviePy + Pexels стокові кадри — **безкоштовно**)
+5. 🖼️ **Генерує** thumbnail (Pillow, 1280×720, CTR-оптимізований — **безкоштовно**)
 6. 🛡️ **Перевіряє** якість (Bayesian gate + Cosine Similarity + Compliance)
 7. 📤 **Публікує** на YouTube (OAuth2, unlisted-first, AI disclosure)
 8. 📈 **Навчається** з метрик (EMA feedback → UCB1 Bandit → краще наступного разу)
 
 **Ціль:** $5 000+/місяць пасивного доходу від AdSense на автопілоті.
+
+---
+
+## 💰 Стек безкоштовних сервісів
+
+### LLM (мозок — генерація тексту)
+
+| Сервіс | Безкоштовний ліміт | Реєстрація | Рекомендація |
+|--------|-------------------|-----------|-------------|
+| **Groq Cloud** | 14 400 запитів/день | [console.groq.com](https://console.groq.com) ✅ без картки | ⭐ Головний |
+| **Google Gemini 1.5 Flash** | 1 500 запитів/день | [aistudio.google.com](https://aistudio.google.com/app/apikey) ✅ | ⭐ Резерв |
+| Ollama (self-hosted) | ♾ unlimited | Oracle Free Tier ARM VM | Опціонально |
+
+### TTS (озвучення — авто-перемикання при вичерпанні)
+
+| Сервіс | Безкоштовний ліміт | Ключ потрібен? | Якість |
+|--------|-------------------|--------------|--------|
+| **edge-tts** | ♾ **БЕЗЛІМІТНО** | ❌ Ні | ⭐⭐⭐⭐ |
+| **ElevenLabs** | 10 000 символів/місяць | ✅ [elevenlabs.io](https://elevenlabs.io) | ⭐⭐⭐⭐⭐ |
+| **Gemini TTS** | ~1 000 000 символів/день | ✅ той самий GEMINI_API_KEY | ⭐⭐⭐⭐ |
+| **TTSMaker** | 20 000 символів/тиждень | ✅ [ttsmaker.com](https://ttsmaker.com) | ⭐⭐⭐ |
+
+> 💡 **Логіка**: бот автоматично перевіряє залишок квоти і перемикається на наступний сервіс. edge-tts завжди останній в ланцюгу як необмежений fallback.
+
+### Відео (стокові кадри — без AI відео-генерації)
+
+| Сервіс | Безкоштовний ліміт | Ліцензія |
+|--------|-------------------|---------|
+| **Pexels API** | 200 запитів/год, 20 000/міс | Комерційне ✅, без атрибуції |
+| **Pixabay API** | 5 000 запитів/день | Комерційне ✅, без атрибуції |
+| **YouTube Audio Library** | ♾ unlimited | Для YouTube відео ✅ |
+
+> 🎥 **Чому не CapCut/Kling/Veo?** Їх безкоштовні tier не мають публічного API — тільки веб-інтерфейс. Наш бот використовує Pexels stock footage + MoviePy для автоматичного монтажу, що набагато надійніше для автоматизації.
 
 ---
 
@@ -46,7 +92,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                        YTAIMBOT PIPELINE v1.0                           │
+│                     YTAIMBOT PIPELINE v2.0 — $0 AI                      │
 ├──────────┬──────────┬──────────┬──────────┬──────────┬──────────────────┤
 │ STAGE 1  │ STAGE 2  │ STAGE 3  │ STAGE 4  │ STAGE 5  │    STAGE 6       │
 │ INGEST   │FEATURIZE │  REDUCE  │  SCORE   │   PLAN   │      GATE        │
@@ -58,10 +104,11 @@
 │ STAGE 7  │ STAGE 8  │ STAGE 9  │ STAGE 10 │ STAGE 11 │    STAGE 12      │
 │  SCRIPT  │  AUDIO   │SUBTITLES │  VIDEO   │THUMBNAIL │    PUBLISH       │
 │          │          │          │          │          │                  │
-│ Ollama   │ Edge-TTS │ SRT gen  │ MoviePy  │  Pillow  │ YouTube API v3   │
-│ LLM +    │ (uk-UA)  │Sliding   │  FFmpeg  │ 1280×720 │ unlisted-first   │
-│ Template │→ Coqui   │ Window   │  1080p   │ CTR opt  │ AI disclosure ✅  │
-│ fallback │ fallback │ align    │  30fps   │          │ Token Bucket 🪣   │
+│ Groq     │ edge-tts │ SRT gen  │ MoviePy  │  Pillow  │ YouTube API v3   │
+│ (free)→  │(unlimited│Sliding   │  +Pexels │ 1280×720 │ unlisted-first   │
+│ Gemini   │ fallback)│ Window   │  stock   │ CTR opt  │ AI disclosure ✅  │
+│ (free)   │→ElevenLab│ align    │  1080p   │          │ Token Bucket 🪣   │
+│          │→TTSMaker │          │  30fps   │          │                  │
 └──────────┴──────────┴──────────┴──────────┴──────────┴──────────────────┘
 ```
 
@@ -74,143 +121,113 @@ YTAIMBot/
 │   ├── trend_analyzer.py      #   TruncatedSVD + L2 ranking
 │   ├── quality/
 │   │   ├── bayes_filter.py    #   Gaussian Naive Bayes gate
-│   │   ├── similarity_gate.py #   TF-IDF + Edit Distance (Levenshtein)
-│   │   ├── blocklist.py       #   Aho-Corasick multi-pattern
-│   │   ├── evidence.py        #   Merkle-like artifact chain
-│   │   └── compliance.py      #   Pre-publish checklist
+│   │   └── similarity_gate.py #   TF-IDF + Edit Distance
 │   ├── content/
-│   │   ├── generator.py       #   ScriptGenerator (Hook→Body→CTA)
-│   │   ├── template_engine.py #   Cosine similarity template select
-│   │   └── templates/         #   tutorial / explainer / shorts / review / listicle
+│   │   ├── script_generator.py #  ScriptGenerator (Hook→Body→CTA)
+│   │   └── token_budget.py    #   Proportional token allocation
 │   ├── seo/
-│   │   ├── optimizer.py       #   BFS keyword expansion + PageRank
-│   │   └── title_generator.py #   CTR-scoring (weighted sum)
-│   ├── feedback/
-│   │   ├── scorer.py          #   EMA feedback loop
-│   │   ├── ab_tester.py       #   Chi-Square A/B testing
-│   │   ├── forecaster.py      #   ARIMA trend forecasting
-│   │   └── monte_carlo.py     #   Revenue simulation (10K runs)
-│   ├── learner/
-│   │   ├── bandit.py          #   UCB1 Multi-Armed Bandit
-│   │   ├── drift_detector.py  #   KS-test + Reservoir Sampling
-│   │   └── optimizer.py       #   Linear PPO (no GPU needed)
+│   │   ├── title_optimizer.py #   CTR-scoring (12 шаблонів)
+│   │   └── thumbnail_scorer.py #  Pillow Weber contrast + Sobel
+│   ├── quota/
+│   │   └── service_tracker.py #   SQLite квота-трекер (всі free-tier сервіси)
 │   └── utils/
-│       ├── random.py          #   make_rng(seed) — детермінізм
-│       ├── kalman.py          #   Scalar Kalman Filter
-│       ├── hyperloglog.py     #   Cardinality estimation
-│       └── metrics.py         #   Prometheus metrics registry
+│       └── random.py          #   make_rng(seed) — детермінізм
 │
 ├── modules/                   # ⚙️ Бекенд (оркестрація, адаптери)
 │   ├── orchestrator.py        #   Pipeline (12 стадій, fail-closed)
-│   ├── scheduler.py           #   Upload Scheduler (Min-Heap)
-│   ├── metrics_collector.py   #   YouTube Analytics API
-│   ├── adapters/
-│   │   ├── base.py            #   ABCs: TrendSource, TTS, LLM, Publisher
-│   │   ├── synthetic.py       #   Тестові in-memory реалізації
-│   │   ├── google_trends.py   #   trendspyg RSS → TrendSignal
-│   │   ├── youtube_search.py  #   YouTube API v3 + QuotaTracker
-│   │   ├── composite.py       #   K-way merge (Priority Queue)
-│   │   ├── cache.py           #   LRU Cache + TTL
-│   │   ├── retry.py           #   Exponential Backoff + Jitter
-│   │   ├── tts_edge.py        #   Edge-TTS (uk-UA-OstapNeural)
-│   │   ├── tts_local.py       #   Coqui TTS (offline fallback)
-│   │   ├── llm_local.py       #   Ollama HTTP adapter
-│   │   ├── youtube_publisher.py # YouTube upload + Token Bucket
-│   │   ├── youtube_auth.py    #   OAuth2 + auto-refresh
-│   │   └── sqlite_storage.py  #   SQLite persistence (B-Tree indexes)
-│   ├── video/
-│   │   ├── assembler.py       #   MoviePy + FFmpeg DAG
-│   │   ├── thumbnail.py       #   Pillow Layer Stack (1280×720)
-│   │   ├── subtitles.py       #   SRT generator (Sliding Window)
-│   │   └── ai_generator.py    #   Open-Sora (GPU-gated, optional)
-│   ├── dashboard/
-│   │   ├── manual_review.py   #   CLI review перших 50 відео
-│   │   └── audit_log.py       #   Append-Only JSON Lines
-│   ├── notifications/
-│   │   └── slack.py           #   Slack alerts + Bloom Filter dedup
-│   └── reporting/
-│       └── weekly_report.py   #   ASCII charts + ARIMA forecast
+│   └── adapters/
+│       ├── base.py            #   ABCs: TrendSource, TTS, LLM, Publisher
+│       ├── llm/
+│       │   ├── groq.py        #   ✅ Groq Cloud (14 400 req/day FREE)
+│       │   ├── gemini.py      #   ✅ Google Gemini (1 500 req/day FREE)
+│       │   └── ollama.py      #   Optional: self-hosted Ollama
+│       ├── tts/
+│       │   ├── edge_tts.py    #   ✅ edge-tts (UNLIMITED, no key)
+│       │   ├── elevenlabs.py  #   ✅ ElevenLabs (10k chars/month FREE)
+│       │   ├── gemini_tts.py  #   ✅ Gemini TTS (1M chars/day FREE)
+│       │   ├── ttsmaker.py    #   ✅ TTSMaker (20k chars/week FREE)
+│       │   └── free_tier_chain.py # ✅ Auto-switch chain
+│       ├── video/
+│       │   ├── assembler.py   #   MoviePy + FFmpeg assembly
+│       │   ├── pexels.py      #   ✅ Pexels + Pixabay stock footage
+│       │   ├── thumbnail.py   #   Pillow thumbnail generator
+│       │   └── subtitle.py    #   SRT subtitle generator
+│       └── publisher/
+│           ├── youtube_upload.py  # YouTube Data API v3 (OAuth2)
+│           └── quota_guard.py     # Token Bucket (6 uploads/day max)
 │
-├── tests/                     # 🧪 Pytest (≥90% coverage)
-│   ├── conftest.py            #   Fixtures: seeded rng, synthetic trends
-│   ├── e2e/                   #   E2E: 8 сценаріїв з матриці
-│   ├── load/                  #   Locust: ≤5хв run, ≤3.5GB RAM
-│   ├── test_trend_analyzer.py
-│   ├── test_bayes_filter.py
-│   ├── test_orchestrator.py
-│   └── ...                    #   30+ тест-файлів
-│
-├── scripts/
-│   ├── deploy/                #   Blue-Green deploy, systemd, logrotate
-│   ├── backup/                #   GFS backup + AES-256 + S3
-│   └── monitoring/            #   Prometheus + Grafana configs
-│
-├── docs/
-│   └── ROADMAP_AI_AGENT_TASKS.md  # 📋 640 задач для AI агентів
-│
-├── Dockerfile                 # Python 3.11-slim + FFmpeg
-├── docker-compose.yml         # Bot + Prometheus + Grafana
-└── pyproject.toml             # Python 3.11+, numpy, scikit-learn
+└── tests/                     # 🧪 Pytest (190+ passing)
 ```
 
 ---
 
-## ☁️ Розгортання у хмарі (VPS)
+## 🚀 Швидкий старт ($0)
 
-> Бот працює **повністю в хмарі** — локальний сервер не потрібен.
-> **Вартість:** ~$4-6/місяць (Hetzner CX22 або DigitalOcean).
-> 📋 [**Повна інструкція →** `docs/DEPLOYMENT_CLOUD_VPS.md`](docs/DEPLOYMENT_CLOUD_VPS.md)
-
-### Коротко: 5 кроків
+### Крок 1 — Отримай безкоштовні ключі (5 хвилин)
 
 ```bash
-# ─── 1. На своєму ПК: генеруємо SSH ключ ───────────────────────────────────
-ssh-keygen -t ed25519 -C "ytaimbot" -f ~/.ssh/ytaimbot_vps
-# Публічний ключ → вставити у Hetzner/DigitalOcean при створенні сервера
+# 1. Groq API (головний LLM) — 14 400 запитів/день FREE
+#    → Зайди на console.groq.com → "Create API Key"
+#    → Без кредитної картки!
 
-# ─── 2. Підключаємось до VPS ────────────────────────────────────────────────
-ssh -i ~/.ssh/ytaimbot_vps root@YOUR_SERVER_IP
+# 2. Google AI Studio (резервний LLM + TTS) — FREE
+#    → aistudio.google.com/app/apikey → "Create API key"
+#    → Той самий ключ для LLM і TTS!
 
-# ─── 3. На VPS: встановлюємо Docker ────────────────────────────────────────
-curl -fsSL https://get.docker.com | sh && apt-get install -y docker-compose-plugin
+# 3. Pexels API (стокові відео) — FREE
+#    → pexels.com/api → "Your API Key"
+#    → Без кредитної картки!
 
-# ─── 4. Клонуємо та налаштовуємо ───────────────────────────────────────────
-cd /opt && git clone https://github.com/Dmitze/YTAIMBot.git && cd YTAIMBot
-cp .env.example .env && nano .env   # ← вставляємо YOUTUBE_API_KEY
-
-# ─── 5. Запускаємо ─────────────────────────────────────────────────────────
-mkdir -p /opt/ytaimbot-data
-docker compose up -d
-docker compose logs -f bot           # перевіряємо що все ОК
+# 4. YouTube API (тренди + публікація) — FREE
+#    → console.cloud.google.com → APIs & Services → YouTube Data API v3
 ```
 
-### Вибір VPS
-
-| Хостинг | Тариф | Ціна | RAM | Примітка |
-|---------|-------|------|-----|---------|
-| **Hetzner** 🇩🇪 | CX22 | €3.79/міс | 4GB | **Рекомендовано** — найдешевше |
-| **Hetzner** 🇩🇪 | CX32 | €5.77/міс | 8GB | Якщо потрібен Ollama (offline LLM) |
-| **DigitalOcean** 🌊 | Basic | $6/міс | 1GB | $200 безкоштовних кредитів для нових |
-| **DigitalOcean** 🌊 | Basic | $12/міс | 2GB | Для Coqui TTS offline |
-
-### Шпаргалка команд
-
-```bash
-docker compose ps                         # статус
-docker compose logs -f bot                # логи live
-docker compose exec bot python -m modules.orchestrator  # ручний запуск
-sqlite3 /opt/ytaimbot-data/ytaimbot.db ".tables"       # переглянути БД
-cd /opt/YTAIMBot && git pull && docker compose up -d --build  # оновлення
-```
-
-### Локально (тільки розробка)
+### Крок 2 — Запуск локально
 
 ```bash
 git clone https://github.com/Dmitze/YTAIMBot.git && cd YTAIMBot
 pip install -e ".[dev]"
+cp .env.example .env
+
+# Заповни ключі в .env:
+# GROQ_API_KEY=gsk_...
+# GEMINI_API_KEY=AIza...
+# PEXELS_API_KEY=...
+
+# Тест (без реальних API викликів)
 pytest -q --tb=short
+
+# Запуск pipeline (dry-run)
 YTAIMBOT_DRY_RUN=true python -m modules.orchestrator
 ```
+
+### Крок 3 — Деплой (GitHub Actions — теж безкоштовно!)
+
+```bash
+# GitHub Actions FREE: 2 000 хвилин/місяць
+# Достатньо для 1-2 відео/день з 5-хвилинним pipeline!
+
+# Додай секрети в GitHub: Settings → Secrets → Actions
+# GROQ_API_KEY, GEMINI_API_KEY, PEXELS_API_KEY,
+# YOUTUBE_API_KEY, YOUTUBE_OAUTH_TOKEN_JSON
+
+# Pipeline запускається автоматично щодня в 09:00 UTC
+# .github/workflows/daily_pipeline.yml
+```
+
+---
+
+## ☁️ Варіанти хостингу
+
+| Платформа | Вартість | RAM | Підходить для |
+|-----------|----------|-----|-------------|
+| **GitHub Actions** ⭐ | **$0/міс** (2000 хв/міс) | 7GB | Старт — 1-2 відео/день |
+| **Oracle Cloud Free** 🆓 | **$0 назавжди** | 24GB ARM | Ollama + повний pipeline |
+| **Render.com Free** | $0 (750 год/міс) | 512MB | Тільки API сервер |
+| **Railway.app** | ~$0-5/міс | 512MB | Dev/test |
+| **Hetzner CX22** | €3.79/міс | 4GB | Production (після монетизації) |
+
+> 💡 **Рекомендована стратегія:** Починай з GitHub Actions ($0). Коли канал заробляє $20+/міс — переходь на Oracle Free Tier або Hetzner CX22.
 
 ---
 
@@ -221,68 +238,52 @@ YTAIMBOT_DRY_RUN=true python -m modules.orchestrator
 ```bash
 # .env (ніколи не комітити!)
 
-# === Основні ===
-YTAIMBOT_DRY_RUN=true          # false → реальна публікація
-YTAIMBOT_SEED=42               # ML детермінізм
-YTAIMBOT_DATA_DIR=/app/data    # volume для відео, БД, logs
+# === LLM — мозок (обидва безкоштовні) ===
+GROQ_API_KEY=gsk_...           # console.groq.com (рекомендовано)
+GEMINI_API_KEY=AIza...         # aistudio.google.com (резерв)
+
+# === TTS — озвучення ===
+TTS_VOICE=uk-UA-OstapNeural   # edge-tts — безлімітно і безкоштовно
+ELEVENLABS_API_KEY=...         # +якість (10k симв/міс free)
+TTSMAKER_API_TOKEN=...         # +резерв (20k симв/тиждень free)
+
+# === Відео ===
+PEXELS_API_KEY=...             # стокові кадри (free)
+PIXABAY_API_KEY=...            # стокові кадри backup (free)
 
 # === YouTube ===
-YOUTUBE_API_KEY=AIza...        # Data API v3 (trends)
-YOUTUBE_CLIENT_SECRET_PATH=... # OAuth2 для upload
+YOUTUBE_API_KEY=AIza...        # тренди (free)
+YOUTUBE_CLIENT_SECRET_PATH=data/client_secret.json  # публікація
+
+# === Pipeline ===
+YTAIMBOT_DRY_RUN=true         # false = реальна публікація
+YTAIMBOT_SEED=42               # ML детермінізм
 MAX_UPLOADS_PER_DAY=1          # ліміт публікацій
-
-# === LLM ===
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=llama3
-
-# === TTS ===
-TTS_LANGUAGE=uk                # uk / en / ru
-TTS_GENDER=male                # male / female
-
-# === Video ===
-VIDEO_RESOLUTION=1920x1080
-VIDEO_FPS=30
-
-# === Feedback ===
-FEEDBACK_ALPHA=0.3             # EMA learning rate
-BANDIT_EXPLORATION_C=2.0       # UCB1 exploration constant
-DRIFT_THRESHOLD=0.05           # KS-test p-value threshold
-
-# === Monitoring ===
-SLACK_WEBHOOK_URL=https://hooks.slack.com/...
-S3_BUCKET=ytaimbot-backups
+SCRIPT_LANGUAGE=uk             # мова відео
 ```
 
 ---
 
 ## 🧮 Алгоритми + Структури даних
 
-Проєкт використовує **35+ алгоритмів** з Computer Science — кожен обраний з обґрунтуванням:
+Проєкт використовує **35+ алгоритмів** з Computer Science:
 
 | Категорія | Алгоритм | Big-O | Де використовується |
 |-----------|----------|-------|-------------------|
 | **ML** | TruncatedSVD | O(n·d·k) | Зниження розмірності трендів |
 | **ML** | Gaussian Naive Bayes | O(features) | Quality gate |
 | **ML** | UCB1 Bandit | O(k) | Вибір ніші (exploration/exploitation) |
-| **ML** | Linear PPO | O(batch·dim) | Оптимізація параметрів контенту |
 | **ML** | ARIMA(1,1,1) | O(n·p²) | Прогноз трендів на тиждень вперед |
 | **Статистика** | Kalman Filter | O(1) | Згладжування CTR/RPM шуму |
+| **Статистика** | EMA | O(1) | Smooth analytics, TTS quota |
 | **Статистика** | Monte Carlo | O(N·V) | P(revenue ≥ $5K) симуляція |
-| **Статистика** | KS-test | O(n log n) | Виявлення distribution drift |
-| **Статистика** | Chi-Square | O(1) | A/B тест значимість |
 | **Пошук** | Aho-Corasick | O(n+m+z) | Multi-pattern blocklist |
 | **Пошук** | BFS | O(V+E) | SEO keyword expansion |
-| **Пошук** | PageRank | O(k·E) | Keyword importance graph |
 | **Структури** | LRU Cache | O(1) | Trend adapter caching |
-| **Структури** | Min-Heap | O(log n) | Upload scheduler |
-| **Структури** | Bloom Filter | O(k) | Alert deduplication |
-| **Структури** | Merkle Chain | O(n) | Evidence artifact integrity |
+| **Структури** | Token Bucket | O(1) | Upload rate limiting |
+| **Структури** | Sliding Window | O(1) | Free-tier quota tracking |
+| **Ланцюг** | Chain of Responsibility | O(n) | TTS fallback chain |
 | **DP** | Edit Distance | O(n·m) | Plagiarism detection |
-| **DP** | Token Budget | O(n·W) | Script section allocation |
-| **Greedy** | Token Bucket | O(1) | Rate limiting |
-| **Greedy** | Activity Selection | O(n log n) | Upload scheduling |
-
-> 📋 Повна таблиця (40+ алгоритмів) → [`docs/ROADMAP_AI_AGENT_TASKS.md`](docs/ROADMAP_AI_AGENT_TASKS.md)
 
 ---
 
@@ -294,11 +295,9 @@ S3_BUCKET=ytaimbot-backups
 | 👆 CTR | ≥ 4% | **≥ 6%** | YouTube Studio |
 | 👁️ Retention 30s | ≥ 60% | **≥ 70%** | YouTube Analytics |
 | 📹 Відео/день | 1 / 3 дні | **1 / день** | Scheduler logs |
-| 🔄 Uptime | ≥ 99% | **≥ 99.9%** | Hetzner monitor |
-| ⏱️ Час обробки | ≤ 10 хв | **≤ 5 хв** | Prometheus histogram |
+| 🔄 Uptime | ≥ 99% | **≥ 99.9%** | GitHub Actions |
+| 💲 AI cost | — | **$0/міс** | Free-tier only |
 | 🧪 Test coverage | ≥ 80% | **≥ 90%** | `pytest --cov` |
-| 🎯 Bayes precision | ≥ 80% | **≥ 95%** | `test_bayes_filter.py` |
-| 📉 Build time CI | ≤ 3 хв | **≤ 2 хв** | GitHub Actions |
 
 ---
 
@@ -306,21 +305,19 @@ S3_BUCKET=ytaimbot-backups
 
 ```
 Phase 0  ████████████████████  100% ✅  Foundation (15/15 tasks)
-Phase 1  ░░░░░░░░░░░░░░░░░░░░    0% 🔲  Real Trend Adapters
-Phase 2  ░░░░░░░░░░░░░░░░░░░░    0% 🔲  Content Generation
-Phase 3  ░░░░░░░░░░░░░░░░░░░░    0% 🔲  Video Assembly + SEO
-Phase 4  ░░░░░░░░░░░░░░░░░░░░    0% 🔲  Publishing Pipeline
-Phase 5  ░░░░░░░░░░░░░░░░░░░░    0% 🔲  Metrics Feedback Loop
-Phase 6  ░░░░░░░░░░░░░░░░░░░░    0% 🔲  RL Learner + Bandit
-Phase 7  ░░░░░░░░░░░░░░░░░░░░    0% 🔲  Infrastructure + DevOps
-Phase 8  ░░░░░░░░░░░░░░░░░░░░    0% 🔲  Security + Compliance
-Phase 9  ░░░░░░░░░░░░░░░░░░░░    0% 🔲  Testing + Coverage ≥90%
-Phase 10 ░░░░░░░░░░░░░░░░░░░░    0% 🔲  Docs + Launch 🚀
+Phase 1  ████████████████████  100% ✅  Real Trend Adapters
+Phase 2  ████████████████████  100% ✅  Content Generation (LLM + TTS)
+Phase 3  ████████████████████  100% ✅  SEO (TitleOptimizer + ThumbnailScorer)
+Phase 4  ████████████████████  100% ✅  Video Assembly + Publishing
+Phase 5  ████░░░░░░░░░░░░░░░░   20% 🔄  Free-Tier Stack (QuotaGuard + YouTube Upload)
+Phase 6  ░░░░░░░░░░░░░░░░░░░░    0% 🔲  Metrics Feedback Loop + EMA
+Phase 7  ░░░░░░░░░░░░░░░░░░░░    0% 🔲  RL Learner + UCB1 Bandit
+Phase 8  ░░░░░░░░░░░░░░░░░░░░    0% 🔲  Infrastructure + DevOps
+Phase 9  ░░░░░░░░░░░░░░░░░░░░    0% 🔲  Security + Compliance
+Phase 10 ░░░░░░░░░░░░░░░░░░░░    0% 🔲  Testing + Coverage ≥90%
 
-Overall  ███░░░░░░░░░░░░░░░░░    2%    15 / 640 tasks done
+Tests    ████████████████░░░░   83%    190 passed, 17 skipped
 ```
-
-> 📋 **[Повний roadmap (640 задач) →](docs/ROADMAP_AI_AGENT_TASKS.md)**
 
 ---
 
@@ -344,9 +341,6 @@ BayesQualityFilter ──▶ [P(bad|features) < threshold]
 ComplianceChecker ──▶ [AI disclosure + no PII]
     │                       │ FAIL → block
     ▼                    ───┘
-ManualReview ──▶ [перші 50 відео: ручне підтвердження]
-    │                       │ REJECT → archive
-    ▼                    ───┘
 YouTubePublisher ← тільки якщо ВСІ gates пройдені ✅
                   + YTAIMBOT_DRY_RUN=false
 ```
@@ -364,47 +358,6 @@ pytest --cov=src --cov=modules --cov-report=term-missing
 
 # Один модуль
 pytest tests/test_trend_analyzer.py -v
-
-# E2E тести (потрібні всі mock)
-pytest tests/e2e/ -v
-
-# Property-based тести (Hypothesis)
-pytest tests/ -k "property" -v
-
-# Load тест (Locust)
-locust -f tests/load/locustfile.py --headless -u 10 -r 2 --run-time 60s
-```
-
----
-
-## 🚀 Deployment Stack
-
-### Infrastructure (Cloud VPS)
-
-| Компонент | Технологія | Де запускається |
-|-----------|-----------|-----------------|
-| Runtime | Python 3.11+ | Docker container на VPS |
-| ML | NumPy + scikit-learn + statsmodels | В контейнері |
-| Video | MoviePy + FFmpeg | В контейнері |
-| LLM | Groq API (безкоштовно) або Ollama | Groq cloud / локально в VPS |
-| TTS | Edge-TTS (Microsoft, безкоштовно) | HTTP виклик з VPS |
-| Storage | SQLite (файл на VPS) | `/opt/ytaimbot-data/ytaimbot.db` |
-| Backup | SQLite snapshot → gzip → Cloudflare R2 | Cron щодня 03:00 |
-| Container | Docker + docker-compose | VPS |
-| Server | **Hetzner CX22** (2vCPU, 4GB, 40GB) | Hetzner Cloud EU |
-| Monitoring | Prometheus + Grafana | VPS, порт 3000 |
-| CI/CD | GitHub Actions | GitHub |
-
-### Вартість у хмарі
-
-```
-Hetzner CX22       €3.79/міс   (~$4.10)
-Groq API LLM        $0.00/міс  (14K req/день безкоштовно)
-Edge-TTS            $0.00/міс  (безкоштовний Microsoft)
-YouTube Data API    $0.00/міс  (10K units/день безкоштовно)
-Cloudflare R2       $0.00/міс  (до 10GB backup безкоштовно)
-─────────────────────────────────────────
-TOTAL:             ~$4-6/міс   (≈ 200 грн/міс)
 ```
 
 ---
@@ -415,15 +368,10 @@ TOTAL:             ~$4-6/міс   (≈ 200 грн/міс)
 |----------|------|
 | [**ROADMAP (640 tasks)**](docs/ROADMAP_AI_AGENT_TASKS.md) | Головний roadmap для AI агентів |
 | [Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md) | Системна архітектура |
-| [Dataflow](docs/ARCHITECTURE_DATAFLOW.md) | Потік даних через 12 стадій |
-| [SRS Requirements](docs/SRS_SYSTEM_REQUIREMENTS.md) | Функціональні вимоги |
-| [Design: ML Modules](docs/DESIGN_ML_MODULES.md) | TrendAnalyzer, BayesFilter spec |
-| [Design: Storage](docs/DESIGN_STORAGE_SCHEMA.md) | SQLite схема (4 таблиці) |
-| [Deployment Guide](docs/DEPLOYMENT_GUIDE_HETZNER_LOCAL_FIRST.md) | Hetzner + Docker setup |
-| [Security Guide](docs/SECURITY_ERROR_HANDLING_GUIDE.md) | Secrets + error handling |
-| [Risk Register](docs/RISK_REGISTER.md) | R-01 через R-08 |
-| [Compliance Checklist](docs/COMPLIANCE_CHECKLIST.md) | YouTube ToS + GDPR |
+| [Deployment Guide](docs/DEPLOYMENT_CLOUD_VPS.md) | GitHub Actions + Oracle Free + Hetzner |
 | [Monetization Guide](docs/MONETIZATION_ANALYTICS_GUIDE.md) | YPP + ROI калькулятор |
+| [Security Guide](docs/SECURITY_ERROR_HANDLING_GUIDE.md) | Secrets + error handling |
+| [Compliance Checklist](docs/COMPLIANCE_CHECKLIST.md) | YouTube ToS + GDPR |
 
 ---
 
@@ -433,8 +381,8 @@ TOTAL:             ~$4-6/міс   (≈ 200 грн/міс)
 
 ```
 1. Прочитай docs/ROADMAP_AI_AGENT_TASKS.md — там 640 задач
-2. Знайди першу задачу зі статусом 🔲 Pending
-3. Перевір що всі залежності ✅ Done
+2. ВАЖЛИВО: Всі AI-сервіси — ТІЛЬКИ безкоштовні тарифи!
+3. Знайди першу задачу зі статусом 🔲 Pending
 4. Постав статус 🔄 In Progress
 5. Виконай задачу (файл → тести → acceptance criteria)
 6. Постав статус ✅ Done + дата виконання
@@ -446,6 +394,7 @@ TOTAL:             ~$4-6/міс   (≈ 200 грн/міс)
 - Тести: ніяких реальних HTTP/API викликів — тільки mock
 - ML: завжди `np.random.Generator` як параметр (детермінізм!)
 - Publishing: fail-closed — тільки після всіх gate ✅
+- **AI services: ONLY free tiers — ніяких платних API!**
 
 ---
 
@@ -457,7 +406,7 @@ MIT © 2026 Dmitze
 
 <div align="center">
 
-**Зроблено з ❤️ та 640 задачами**
+**Зроблено з ❤️ та $0 бюджетом на AI**
 
 *Від ідеї до $5K/місяць — крок за кроком, алгоритм за алгоритмом*
 
