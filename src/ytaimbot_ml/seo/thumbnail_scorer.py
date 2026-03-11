@@ -180,7 +180,7 @@ class ThumbnailScorer:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _contrast_score(pixels: "np.ndarray") -> float:  # type: ignore[name-defined]
+    def _contrast_score(pixels: "np.ndarray") -> float:  # noqa: F821  # type: ignore[name-defined]
         """Luminance contrast between bright and dark regions. O(pixels).
 
         Algorithm: split pixels into top/bottom luminance quartiles,
@@ -212,7 +212,7 @@ class ThumbnailScorer:
         return min(1.0, weber / 3.0)  # normalize: 3.0 ≈ high contrast
 
     @staticmethod
-    def _color_energy(pixels: "np.ndarray") -> float:  # type: ignore[name-defined]
+    def _color_energy(pixels: "np.ndarray") -> float:  # type: ignore[name-defined]  # noqa: F821
         """Mean HSV saturation as a proxy for visual vibrancy. O(pixels).
 
         Parameters
@@ -236,7 +236,7 @@ class ThumbnailScorer:
         return min(1.0, mean_sat)
 
     @staticmethod
-    def _edge_density(pixels: "np.ndarray") -> float:  # type: ignore[name-defined]
+    def _edge_density(pixels: "np.ndarray") -> float:  # type: ignore[name-defined]  # noqa: F821
         """Sharpness proxy via Sobel gradient magnitude. O(pixels).
 
         Uses a simplified 3×3 Sobel without scipy/cv2 dependency.
@@ -266,7 +266,7 @@ class ThumbnailScorer:
         return min(1.0, density * 4.0)  # scale: ~25% edges → score 1.0
 
     @staticmethod
-    def _text_ratio(pixels: "np.ndarray") -> float:  # type: ignore[name-defined]
+    def _text_ratio(pixels: "np.ndarray") -> float:  # type: ignore[name-defined]  # noqa: F821
         """Ratio of near-white or near-black pixels (text proxy). O(pixels).
 
         High-contrast text creates clusters of very bright or very dark pixels.
@@ -291,4 +291,5 @@ class ThumbnailScorer:
         dark   = float(np.mean(luminance < 0.15))  # near-black
         ratio  = bright + dark
         return min(1.0, ratio * 3.0)  # scale: ~33% text pixels → score 1.0
+
 

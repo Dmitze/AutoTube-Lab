@@ -42,8 +42,6 @@ from modules.adapters.base import StorageAdapter
 from ytaimbot_ml.schemas import (
     ChannelStats,
     ComplianceReport,
-    ContentPlan,
-    PipelineResult,
     TrendSignal,
 )
 

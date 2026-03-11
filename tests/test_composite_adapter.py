@@ -8,7 +8,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from modules.adapters.composite import CompositeTrendSource
-from modules.adapters.synthetic import SyntheticTrendSource
 from ytaimbot_ml.schemas import TrendSignal
 
 

@@ -46,7 +46,6 @@ from ytaimbot_ml.schemas import (
     Script,
     TrendRanking,
     TrendSignal,
-    UploadResult,
 )
 from ytaimbot_ml.trend_analyzer import TrendAnalyzer
 from ytaimbot_ml.utils.random import make_rng
@@ -526,7 +525,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
-    from modules.adapters.synthetic import InMemoryStorage, SyntheticTrendSource
+    from modules.adapters.synthetic import InMemoryStorage
 
     seed = int(os.environ.get("YTAIMBOT_SEED", "42"))
     dry_run = os.environ.get("YTAIMBOT_DRY_RUN", "true").lower() != "false"

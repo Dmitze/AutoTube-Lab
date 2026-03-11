@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 from sklearn.decomposition import TruncatedSVD
 
-from ytaimbot_ml.schemas import TrendFeatures, TrendRanking, TrendSignal
+from ytaimbot_ml.schemas import TrendRanking, TrendSignal
 
 
 class TrendAnalyzer:

@@ -23,7 +23,6 @@ Tracked metrics:
 from __future__ import annotations
 
 import logging
-from typing import ClassVar
 
 logger = logging.getLogger(__name__)
 

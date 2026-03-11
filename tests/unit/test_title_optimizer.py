@@ -1,5 +1,4 @@
 """Unit tests for TitleOptimizer (Phase 3, T-137–T-148)."""
-import pytest
 
 from ytaimbot_ml.schemas import ContentPlan
 from ytaimbot_ml.seo.title_optimizer import TitleOptimizer, TitleScore

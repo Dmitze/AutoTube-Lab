@@ -37,7 +37,6 @@ Keyword injection algorithm (Aho-Corasick-lite):
 from __future__ import annotations
 
 import logging
-import re
 from typing import TYPE_CHECKING
 
 import numpy as np

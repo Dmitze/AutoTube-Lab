@@ -177,7 +177,7 @@ class YouTubeSearchTrendSource(TrendSourceAdapter):
         """
         try:
             from googleapiclient.discovery import build  # noqa: PLC0415
-            from googleapiclient.errors import HttpError  # noqa: PLC0415
+            from googleapiclient.errors import HttpError  # noqa: F401,PLC0415
         except ImportError:
             logger.warning("google-api-python-client not installed; using synthetic")
             return self._fallback.fetch()

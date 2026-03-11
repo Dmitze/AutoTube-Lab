@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import datetime
 import logging
-from dataclasses import dataclass, field
 
 from ytaimbot_ml.niches.ghibli_asmr import SubNiche
 

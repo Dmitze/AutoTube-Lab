@@ -28,7 +28,6 @@ Complexity: O(frames × quality) = O(duration × fps × resolution)
 from __future__ import annotations
 
 import logging
-import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -131,7 +130,7 @@ class VideoAssembler:
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
         try:
-            from moviepy import AudioFileClip, ColorClip, CompositeVideoClip  # noqa: PLC0415
+            from moviepy import AudioFileClip, ColorClip, CompositeVideoClip  # noqa: F401,PLC0415
         except ImportError as exc:
             raise ImportError(
                 "moviepy not installed. Install with: pip install moviepy"

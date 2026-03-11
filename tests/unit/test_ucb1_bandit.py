@@ -14,12 +14,11 @@ Test cases:
   test_reward_shaper_welford           : running mean/variance update
   test_unknown_arm_raises              : update with unknown arm raises KeyError
 """
-import math
 
 import numpy as np
 import pytest
 
-from ytaimbot_ml.rl.ucb1_bandit import ArmStats, UCB1Bandit
+from ytaimbot_ml.rl.ucb1_bandit import UCB1Bandit
 from ytaimbot_ml.rl.reward_shaper import RewardShaper
 from ytaimbot_ml.utils.random import make_rng
 

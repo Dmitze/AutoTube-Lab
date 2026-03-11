@@ -11,7 +11,6 @@ Test cases:
 
 Status: 🔲 Pending — implement after T-371
 """
-import os
 import pytest
 
 # TODO: import YouTubeUploader after T-371 is implemented

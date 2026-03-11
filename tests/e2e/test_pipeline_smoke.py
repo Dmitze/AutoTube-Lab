@@ -16,7 +16,6 @@ What this tests:
 Run:
     pytest tests/e2e/test_pipeline_smoke.py -v
 """
-import pytest
 
 from modules.adapters.synthetic import InMemoryStorage, SyntheticTrendSource
 from modules.orchestrator import Pipeline

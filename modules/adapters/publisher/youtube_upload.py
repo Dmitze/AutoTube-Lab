@@ -31,7 +31,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from modules.adapters.base import PublisherAdapter
-from modules.adapters.publisher.quota_guard import QuotaExhaustedError, QuotaGuard
+from modules.adapters.publisher.quota_guard import QuotaGuard
 from ytaimbot_ml.schemas import (
     ComplianceReport,
     ContentPlan,

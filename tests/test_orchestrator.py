@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from modules.adapters.synthetic import (
     InMemoryStorage,
@@ -10,7 +9,7 @@ from modules.adapters.synthetic import (
     SyntheticTrendSource,
 )
 from modules.orchestrator import Pipeline
-from ytaimbot_ml.schemas import ComplianceReport, ContentPlan
+from ytaimbot_ml.schemas import ContentPlan
 
 
 # ---------------------------------------------------------------------------

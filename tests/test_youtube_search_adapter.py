@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 
 from modules.adapters.youtube_search import QuotaTracker, YouTubeSearchTrendSource
 from ytaimbot_ml.schemas import TrendSignal

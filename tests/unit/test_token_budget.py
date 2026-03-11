@@ -1,5 +1,4 @@
 """Unit tests for TokenBudget (Phase 2, T-100)."""
-import pytest
 
 from ytaimbot_ml.content.token_budget import TokenBudget
 

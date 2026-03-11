@@ -1,0 +1,31 @@
+version: 2
+updates:
+  # Python dependencies (pip)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Kyiv"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+    ignore:
+      # numpy: don't auto-update major versions (breaking changes)
+      - dependency-name: "numpy"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Kyiv"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "github-actions"
