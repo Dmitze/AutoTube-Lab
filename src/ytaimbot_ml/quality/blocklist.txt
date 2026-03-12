@@ -1,0 +1,54 @@
+# YTAIMBot content safety blocklist
+# One phrase per line. Lines starting with # are comments.
+# Covers YouTube demonetization triggers (2025-2026).
+self harm
+suicide
+pregnant
+pregnancy
+labor and delivery
+giving birth
+visible wound
+open wound
+bloody injury
+medical advice
+cure cancer
+cure disease
+health miracle
+lose weight fast
+diet pill
+weapon tutorial
+how to make bomb
+real breaking news
+this actually happened
+real footage
+shocking news
+minor in danger
+child abuse
+explicit content warning
+adult content
+nsfw
+political propaganda
+election fraud
+fake news verified
+misleading health claim
+unverified medical
+not a doctor but
+death threats
+hate speech
+racial slur
+terrorist attack
+graphic violence
+gore content
+accident footage
+emergency situation
+actual crime scene
+police brutality footage
+real accident
+horrific injury
+disturbing content
+explicit drug use
+dangerous challenge
+mass shooting
+school shooting
+bomb threat
+drug overdose
