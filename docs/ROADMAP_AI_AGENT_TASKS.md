@@ -2991,13 +2991,13 @@ if similarity > self.THRESHOLD:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-553 | 🔲 | Додати `mutmut` до dev залежностей pyproject.toml | `pyproject.toml` | S | T-001 | — |
+| T-553 | ✅ | Додати `mutmut` до dev залежностей pyproject.toml | `pyproject.toml` | S | T-001 | 2026-03-15 |
 | T-554 | 🔲 | Запустити mutmut для `src/ytaimbot_ml/quality/` | CI | L | T-553 | — |
 | T-555 | 🔲 | Досягнути mutation score ≥ 80% для `bayes_filter.py` | `tests/test_bayes_filter.py` | L | T-554 | — |
 | T-556 | 🔲 | Досягнути mutation score ≥ 80% для `similarity_gate.py` | `tests/test_similarity_gate.py` | L | T-554 | — |
 | T-557 | 🔲 | Досягнути mutation score ≥ 80% для `trend_analyzer.py` | `tests/test_trend_analyzer.py` | L | T-554 | — |
 | T-558 | 🔲 | Досягнути mutation score ≥ 80% для `bandit.py` | `tests/test_bandit.py` | L | T-554 | — |
-| T-559 | 🔲 | Додати mutmut до CI як non-blocking check (warning, не fail) | `.github/workflows/ci.yml` | M | T-554 | — |
+| T-559 | ✅ | Додати mutmut до CI як non-blocking check (warning, не fail) | `.github/workflows/ci.yml` | M | T-554 | 2026-03-15 |
 
 ---
 
@@ -3039,9 +3039,9 @@ class PipelineUser(User):
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-560 | 🔲 | Додати `locust` до dev залежностей pyproject.toml | `pyproject.toml` | S | T-001 | — |
-| T-561 | 🔲 | Написати `tests/load/locustfile.py` з PipelineUser | `tests/load/locustfile.py` | L | T-560 | — |
-| T-562 | 🔲 | Налаштувати load test параметри: 10 users, 60s ramp-up | `tests/load/locustfile.py` | M | T-561 | — |
+| T-560 | ✅ | Додати `locust` до dev залежностей pyproject.toml | `pyproject.toml` | S | T-001 | 2026-03-15 |
+| T-561 | ✅ | Написати `tests/load/locustfile.py` з PipelineUser | `tests/load/locustfile.py` | L | T-560 | 2026-03-15 |
+| T-562 | ✅ | Налаштувати load test параметри: 10 users, 60s ramp-up | `tests/load/locustfile.py` | M | T-561 | 2026-03-15 |
 | T-563 | 🔲 | Верифікувати: pipeline run ≤ 5 хвилин під навантаженням | `tests/load/locustfile.py` | L | T-562 | — |
 | T-564 | 🔲 | Верифікувати: RAM використання ≤ 3.5GB (з резервом на Hetzner CX22) | `tests/load/locustfile.py` | L | T-562 | — |
 | T-565 | 🔲 | Верифікувати: error rate < 1% при 10 concurrent users | `tests/load/locustfile.py` | M | T-562 | — |

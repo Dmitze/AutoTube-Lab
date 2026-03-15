@@ -30,6 +30,12 @@ jobs:
         run: bandit -r src/ modules/ -ll -q
       - name: Run tests with coverage
         run: pytest -q --tb=short --cov=src --cov=modules --cov-report=term-missing --cov-report=xml
+      - name: Mutation check (mutmut, non-blocking)
+        if: matrix.python-version == '3.12'
+        continue-on-error: true
+        run: |
+          mutmut run --paths-to-mutate src/ytaimbot_ml/quality --runner "python -m pytest -q tests/test_bayes_filter.py tests/test_similarity_gate.py"
+          mutmut results
       - name: Upload coverage report
         if: matrix.python-version == '3.12'
         uses: actions/upload-artifact@v4
