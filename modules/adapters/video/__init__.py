@@ -1,14 +1,18 @@
-"""Phase 3 — Video adapters sub-package.
+"""Phase 3 — Video adapters sub-package."""
 
-Adapters
---------
-VideoAssembler  : MoviePy + FFmpeg pipeline (clips → final MP4)
-ThumbnailGen    : Pillow 1280×720 thumbnail generator
-SubtitleGen     : SRT/ASS subtitle generator + FFmpeg burn-in
+from __future__ import annotations
 
-Output:
-  videos/  : final MP4 (1080p, H.264, AAC)
-  thumbnails/ : JPEG 1280×720
+from modules.adapters.video.assembler import VideoAssembler
+from modules.adapters.video.kling import KlingAdapter
+from modules.adapters.video.pexels import PexelsStockAdapter, StockVideo
+from modules.adapters.video.subtitle import SubtitleGenerator
+from modules.adapters.video.thumbnail import ThumbnailGenerator
 
-Status: 🔲 Pending — T-300 (Phase 3, EPIC 3.1)
-"""
+__all__ = [
+    "VideoAssembler",
+    "ThumbnailGenerator",
+    "SubtitleGenerator",
+    "PexelsStockAdapter",
+    "StockVideo",
+    "KlingAdapter",
+]
