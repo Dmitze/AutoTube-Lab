@@ -144,6 +144,28 @@ class Task:
 
 ---
 
+## ✅ VERIFIED IMPLEMENTATION SNAPSHOT (2026-03-15)
+
+> Реальний стан коду випереджає табличні статуси вище. Нижче — перевірені задачі, які вже реалізовані й протестовані.
+
+### Верифіковано як **готово**
+
+- **P12 Anti-Demonetization:** `T-920–T-930`  
+  (`TopicBlacklist`, disclaimer frame, trigger detection, anti-dem tests)
+- **P13 Hype Niches:** `T-940`, `T-941`, `T-942`, `T-943`, `T-944`, `T-945`, `T-946`, `T-947`, `T-948`, `T-949`, `T-950`, `T-951`, `T-952`, `T-953`, `T-954`
+- **Security/Compliance:** `T-501–T-517`  
+  (`BlocklistTrie`, `ContentSanitizer`, `EvidenceChain`, `ComplianceChecker`)
+- **Infrastructure/Monitoring:** `T-416`, `T-463–T-471`, `T-523–T-524`, `T-550`
+- **Supplemental algorithms/components:** `T-395`, `T-500`, `T-521`, `T-640`
+- **Storage/Core ops:** `T-431`, text utils, manual review gate + audit log (Phase 4 publish safety integration)
+
+### Поточна валідація
+
+- Повний тест-сьют: **595 passed, 7 skipped**
+- SQL execution tracker: **41/41 done** (для вже реалізованих задач поточного циклу)
+
+---
+
 ## 🆓 FREE-TIER СЕРВІСИ — ДОЗВОЛЕНІ СЕРВІСИ (RULE-11)
 
 > **Концепція:** Можна використовувати БУДЬ-які сервіси (навіть платні) якщо у них є безкоштовний рівень.
