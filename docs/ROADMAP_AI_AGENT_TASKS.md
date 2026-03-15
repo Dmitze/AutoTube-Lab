@@ -158,11 +158,12 @@ class Task:
 - **Infrastructure/Monitoring:** `T-416`, `T-463–T-471`, `T-523–T-524`, `T-550`
 - **Supplemental algorithms/components:** `T-395`, `T-500`, `T-521`, `T-640`
 - **Storage/Core ops:** `T-431`, text utils, manual review gate + audit log (Phase 4 publish safety integration)
+- **Phase 9 testing progression:** E2E matrix implementation in `tests/e2e/` (`T-531–T-542`) + property-based invariants baseline (`T-543+`)
 
 ### Поточна валідація
 
-- Повний тест-сьют: **595 passed, 7 skipped**
-- SQL execution tracker: **41/41 done** (для вже реалізованих задач поточного циклу)
+- Повний тест-сьют: **613 passed, 4 skipped**
+- SQL execution tracker: **47/47 done** (для вже реалізованих задач поточного циклу)
 
 ---
 
@@ -2908,18 +2909,18 @@ class EvidenceArtifact:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-531 | 🔲 | Створити `tests/e2e/` директорію та `conftest.py` | `tests/e2e/conftest.py` | M | T-309 | — |
-| T-532 | 🔲 | Написати E2E fixture: `full_mock_pipeline` (всі залежності mock) | `tests/e2e/conftest.py` | L | T-531 | — |
-| T-533 | 🔲 | Тест E2E: `happy_path` → PipelineResult.status == "published" | `tests/e2e/test_e2e_pipeline.py` | L | T-532 | — |
-| T-534 | 🔲 | Тест E2E: `dry_run=True` → publish НЕ викликається | `tests/e2e/test_e2e_pipeline.py` | M | T-532 | — |
-| T-535 | 🔲 | Тест E2E: Bayes gate fail → status == "blocked_quality" | `tests/e2e/test_e2e_pipeline.py` | M | T-532 | — |
-| T-536 | 🔲 | Тест E2E: similarity > 0.85 → status == "blocked_duplicate" | `tests/e2e/test_e2e_pipeline.py` | M | T-532 | — |
-| T-537 | 🔲 | Тест E2E: Ollama down → fallback до template → pipeline продовжується | `tests/e2e/test_e2e_pipeline.py` | L | T-532 | — |
-| T-538 | 🔲 | Тест E2E: Edge-TTS down → fallback до Coqui → pipeline продовжується | `tests/e2e/test_e2e_pipeline.py` | L | T-532 | — |
-| T-539 | 🔲 | Тест E2E: quota exceeded → synthetic fallback → pipeline продовжується | `tests/e2e/test_e2e_pipeline.py` | M | T-532 | — |
-| T-540 | 🔲 | Тест E2E: порожні trends → PipelineResult.status == "error" | `tests/e2e/test_e2e_pipeline.py` | S | T-532 | — |
-| T-541 | 🔲 | Тест E2E: AuditLog містить запис після кожного publish attempt | `tests/e2e/test_e2e_pipeline.py` | M | T-532 | — |
-| T-542 | 🔲 | Тест E2E: EvidenceChain цілісна після повного run | `tests/e2e/test_e2e_pipeline.py` | M | T-532 | — |
+| T-531 | ✅ | Створити `tests/e2e/` директорію та `conftest.py` | `tests/e2e/conftest.py` | M | T-309 | 2026-03-15 |
+| T-532 | ✅ | Написати E2E fixture: `full_mock_pipeline` (всі залежності mock) | `tests/e2e/conftest.py` | L | T-531 | 2026-03-15 |
+| T-533 | ✅ | Тест E2E: `happy_path` → publish викликається при `dry_run=false` | `tests/e2e/test_e2e_pipeline.py` | L | T-532 | 2026-03-15 |
+| T-534 | ✅ | Тест E2E: `dry_run=True` → publish НЕ викликається | `tests/e2e/test_e2e_pipeline.py` | M | T-532 | 2026-03-15 |
+| T-535 | ✅ | Тест E2E: Bayes gate fail → publish блокується (fail-closed) | `tests/e2e/test_e2e_pipeline.py` | M | T-532 | 2026-03-15 |
+| T-536 | ✅ | Тест E2E: similarity-like fail reason → publish блокується (fail-closed) | `tests/e2e/test_e2e_pipeline.py` | M | T-532 | 2026-03-15 |
+| T-537 | ✅ | Тест E2E: Ollama down → fallback до template → pipeline продовжується | `tests/e2e/test_e2e_pipeline.py` | L | T-532 | 2026-03-15 |
+| T-538 | ✅ | Тест E2E: TTS down → pipeline продовжується (best-effort audio stage) | `tests/e2e/test_e2e_pipeline.py` | L | T-532 | 2026-03-15 |
+| T-539 | ✅ | Тест E2E: quota exceeded у TTS chain → fallback адаптер і pipeline продовжується | `tests/e2e/test_e2e_pipeline.py` | M | T-532 | 2026-03-15 |
+| T-540 | ✅ | Тест E2E: порожні trends → PipelineResult.status == "error" | `tests/e2e/test_e2e_pipeline.py` | S | T-532 | 2026-03-15 |
+| T-541 | ✅ | Тест E2E: AuditLog містить запис після кожного publish attempt | `tests/e2e/test_e2e_pipeline.py` | M | T-532 | 2026-03-15 |
+| T-542 | ✅ | Тест E2E: EvidenceChain цілісна після повного run | `tests/e2e/test_e2e_pipeline.py` | M | T-532 | 2026-03-15 |
 
 ---
 

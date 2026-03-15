@@ -173,14 +173,16 @@ def build_llm_adapter(seed: int = 42) -> Optional[LLMAdapter]:
 
 
 def build_tts_adapter() -> Optional[TTSAdapter]:
-    """Build EdgeTTSAdapter if edge-tts is installed.
+    """Build best available free-tier TTS adapter.
 
-    Falls back to None if edge-tts package is missing (TTS stage skipped).
+    Delegates selection to ``modules.adapters.tts.build_tts_adapter`` which
+    prefers ``FreeTierTTSChain`` (auto-fallback on quota/service errors) and
+    degrades to ``EdgeTTSAdapter`` when chain construction is unavailable.
 
     Returns
     -------
     TTSAdapter | None
-        Configured adapter, or None if edge-tts not available.
+        Configured adapter, or None if no TTS backend is available.
 
     Complexity
     ----------
@@ -192,14 +194,14 @@ def build_tts_adapter() -> Optional[TTSAdapter]:
     >>> adapter is None or hasattr(adapter, 'speak')
     True
     """
-    try:
-        import edge_tts  # noqa: F401  — just checking availability
-        from modules.adapters.tts.edge_tts import EdgeTTSAdapter
-        logger.info("TTS: EdgeTTSAdapter (voice=%s)", os.environ.get("TTS_VOICE", "uk-UA-OstapNeural"))
-        return EdgeTTSAdapter()
-    except ImportError:
-        logger.info("TTS: edge-tts not installed — audio synthesis disabled")
-        return None
+    from modules.adapters.tts import build_tts_adapter as _build_tts
+
+    adapter = _build_tts()
+    if adapter is None:
+        logger.info("TTS: no adapter configured — audio synthesis disabled")
+    else:
+        logger.info("TTS: %s", adapter.__class__.__name__)
+    return adapter
 
 
 def build_youtube_uploader() -> Optional[PublisherAdapter]:
