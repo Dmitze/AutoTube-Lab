@@ -11,6 +11,7 @@ from ytaimbot_ml.niches.hype_characters import (
     HypeSource,
 )
 from ytaimbot_ml.niches.ai_stories import AIStoriesProfile, StoryGenre
+from ytaimbot_ml.niches.story_script_generator import StoryScriptGenerator
 
 __all__ = [
     "GhibliASMRProfile",
@@ -27,4 +28,5 @@ __all__ = [
     "HypeSource",
     "AIStoriesProfile",
     "StoryGenre",
+    "StoryScriptGenerator",
 ]
