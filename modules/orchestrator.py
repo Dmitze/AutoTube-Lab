@@ -29,7 +29,7 @@ import logging
 import os
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from modules.adapters.base import (
     LLMAdapter,
@@ -51,6 +51,9 @@ from ytaimbot_ml.trend_analyzer import TrendAnalyzer
 from ytaimbot_ml.utils.random import make_rng
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from modules.dashboard.manual_review import ManualReviewCLI
 
 
 # ---------------------------------------------------------------------------
@@ -231,6 +234,26 @@ def build_youtube_uploader() -> Optional[PublisherAdapter]:
     return None
 
 
+def build_manual_reviewer() -> Optional["ManualReviewCLI"]:
+    """Build ManualReviewCLI from env if enabled.
+
+    Reads:
+      - MANUAL_REVIEW_ENABLED (default false)
+      - MANUAL_REVIEW_QUOTA (default 50)
+      - MANUAL_REVIEW_LOG_PATH (default data/audit/review_log.jsonl)
+    """
+    enabled = os.environ.get("MANUAL_REVIEW_ENABLED", "false").lower() == "true"
+    if not enabled:
+        return None
+    from modules.dashboard.audit_log import AuditLog
+    from modules.dashboard.manual_review import ManualReviewCLI
+
+    quota = int(os.environ.get("MANUAL_REVIEW_QUOTA", "50"))
+    path = os.environ.get("MANUAL_REVIEW_LOG_PATH", "data/audit/review_log.jsonl")
+    logger.info("ManualReview: enabled quota=%d log=%s", quota, path)
+    return ManualReviewCLI(audit_log=AuditLog(path=path), manual_quota=quota)
+
+
 # ---------------------------------------------------------------------------
 # Pipeline
 # ---------------------------------------------------------------------------
@@ -268,6 +291,7 @@ class Pipeline:
         trend_source: TrendSourceAdapter,
         storage: StorageAdapter,
         publisher: Optional[PublisherAdapter] = None,
+        manual_reviewer: Optional["ManualReviewCLI"] = None,
         llm: Optional[LLMAdapter] = None,
         tts: Optional[TTSAdapter] = None,
         dry_run: bool = True,
@@ -277,6 +301,7 @@ class Pipeline:
         self._source = trend_source
         self._storage = storage
         self._publisher = publisher
+        self._manual_reviewer = manual_reviewer
         self._llm = llm
         self._tts = tts
         self._dry_run = dry_run
@@ -356,7 +381,7 @@ class Pipeline:
 
             # Stage 9: publish (fail-closed)
             if not self._dry_run and self._publisher is not None:
-                self._publish_approved(plans, reports)
+                self._publish_approved(plans, reports, run_id)
 
             result.status = "ok"
 
@@ -476,11 +501,21 @@ class Pipeline:
         self,
         plans: list[ContentPlan],
         reports: list[ComplianceReport],
+        run_id: str,
     ) -> None:
         """Stage 9: Publish only plans whose compliance report is 'pass'."""
         assert self._publisher is not None
         for plan, report in zip(plans, reports):
             if report.decision == "pass":
+                if self._manual_reviewer is not None:
+                    decision = self._manual_reviewer.review(plan, report, run_id=run_id)
+                    if decision.decision != "approve":
+                        logger.info(
+                            "Stage 9 — manual review rejected %s (%s)",
+                            plan.trend_id,
+                            decision.reason,
+                        )
+                        continue
                 ok = self._publisher.publish(plan, report)
                 logger.info("Stage 9 — published %s → %s", plan.trend_id, ok)
             else:
@@ -534,10 +569,12 @@ if __name__ == "__main__":
     llm = build_llm_adapter(seed=seed)
     tts = build_tts_adapter()
     storage = InMemoryStorage()
+    manual_reviewer = build_manual_reviewer()
 
     pipeline = Pipeline(
         trend_source=source,
         storage=storage,
+        manual_reviewer=manual_reviewer,
         llm=llm,
         tts=tts,
         dry_run=dry_run,
