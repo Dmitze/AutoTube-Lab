@@ -108,6 +108,13 @@ class UCB1Bandit:
     1
     """
 
+    # Phase P13 (T-949): default niche arms for monetization strategy routing.
+    DEFAULT_NICHE_ARMS: tuple[str, str, str] = (
+        "ghibli_asmr",
+        "hype_characters",
+        "ai_stories",
+    )
+
     def __init__(
         self,
         arm_ids: list[str],
@@ -139,6 +146,40 @@ class UCB1Bandit:
         }
         self._total_pulls: int = 0
         logger.info("UCB1Bandit initialised with %d arms: %s", len(arm_ids), arm_ids)
+
+    @classmethod
+    def for_niches(
+        cls,
+        rng: np.random.Generator | None = None,
+        arm_ids: list[str] | None = None,
+    ) -> "UCB1Bandit":
+        """Build a bandit preconfigured for default content niches.
+
+        Parameters
+        ----------
+        rng:
+            Optional RNG for deterministic tie-breaking.
+        arm_ids:
+            Optional override list. When omitted, uses
+            ``DEFAULT_NICHE_ARMS`` (Ghibli, Hype, AI Stories).
+
+        Returns
+        -------
+        UCB1Bandit
+            Initialised bandit with niche arms.
+
+        Complexity
+        ----------
+        O(k) where k = number of arms.
+
+        Examples
+        --------
+        >>> b = UCB1Bandit.for_niches()
+        >>> set(UCB1Bandit.DEFAULT_NICHE_ARMS).issubset(set(b.stats))
+        True
+        """
+        selected_arms = list(arm_ids) if arm_ids is not None else list(cls.DEFAULT_NICHE_ARMS)
+        return cls(arm_ids=selected_arms, rng=rng)
 
     # ------------------------------------------------------------------
     # Core API

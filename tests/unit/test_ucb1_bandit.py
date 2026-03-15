@@ -143,6 +143,27 @@ def test_reward_clamped() -> None:
     assert bandit.stats["a"].last_reward == pytest.approx(0.0)
 
 
+def test_for_niches_default_arms() -> None:
+    """for_niches() includes ghibli/hype/stories default strategy arms."""
+    bandit = UCB1Bandit.for_niches(rng=make_rng(42))
+    assert set(UCB1Bandit.DEFAULT_NICHE_ARMS).issubset(set(bandit.stats.keys()))
+
+
+def test_for_niches_selection_after_feedback() -> None:
+    """Niche bandit updates and selects valid configured niche arm."""
+    bandit = UCB1Bandit.for_niches(rng=make_rng(42))
+    # Bootstrap 10 pulls as in roadmap acceptance context.
+    rewards = {
+        "ghibli_asmr": 0.45,
+        "hype_characters": 0.75,
+        "ai_stories": 0.65,
+    }
+    for _ in range(10):
+        arm = bandit.select()
+        bandit.update(arm, rewards[arm])
+    assert bandit.best_arm() in UCB1Bandit.DEFAULT_NICHE_ARMS
+
+
 # ---------------------------------------------------------------------------
 # RewardShaper tests
 # ---------------------------------------------------------------------------
