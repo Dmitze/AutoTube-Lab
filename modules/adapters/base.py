@@ -45,6 +45,66 @@ class StorageAdapter(ABC):
     ) -> None:
         """Persist compliance reports produced during the run."""
 
+    @abstractmethod
+    def save_video(
+        self,
+        video_id: str,
+        trend_id: str,
+        title: str,
+        privacy_status: str = "unlisted",
+    ) -> None:
+        """Record a published video."""
+
+    @abstractmethod
+    def save_metrics(self, metrics: MetricsSnapshot) -> None:
+        """Persist a video metrics snapshot."""
+
+    @abstractmethod
+    def load_archive(self) -> dict[str, str]:
+        """Load all archived script texts for SimilarityGate.
+
+        Returns
+        -------
+        dict[str, str]
+            Map of content_hash -> script_text.
+        """
+
+    @abstractmethod
+    def get_upload_count(self) -> int:
+        """Return the total number of successful uploads."""
+
+    @abstractmethod
+    def list_published_videos(self, limit: int = 100) -> list[dict]:
+        """Return a list of recently published videos."""
+
+    @abstractmethod
+    def load_niche_weights(self) -> dict[str, float]:
+        """Load EMA weights for niches."""
+
+    @abstractmethod
+    def save_niche_weights(self, weights: dict[str, float]) -> None:
+        """Save EMA weights for niches."""
+
+    @abstractmethod
+    def load_bandit_state(self) -> dict[str, dict]:
+        """Load UCB1 bandit arm stats."""
+
+    @abstractmethod
+    def save_bandit_state(self, arm_id: str, n_pulls: int, total_reward: float, last_reward: float) -> None:
+        """Save UCB1 bandit arm stats."""
+
+    @abstractmethod
+    def save_ppo_transition(self, video_id: str, state: list[float], action_idx: int, prob: float) -> None:
+        """Save a PPO transition for later reward update."""
+
+    @abstractmethod
+    def load_ppo_transitions(self) -> list[dict]:
+        """Load all pending PPO transitions."""
+
+    @abstractmethod
+    def clear_ppo_transitions(self) -> None:
+        """Clear all PPO transitions after update."""
+
 
 class PublisherAdapter(ABC):
     """Publishes approved content plans to the target platform."""
