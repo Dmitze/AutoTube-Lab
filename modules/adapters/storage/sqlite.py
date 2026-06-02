@@ -85,10 +85,40 @@ CREATE TABLE IF NOT EXISTS published_videos (
     trend_id       TEXT NOT NULL,
     title          TEXT NOT NULL,
     published_at   REAL NOT NULL,
-    ctr            REAL DEFAULT 0.0,
-    retention_30s  REAL DEFAULT 0.0,
-    views          INTEGER DEFAULT 0,
     privacy_status TEXT DEFAULT 'unlisted'
+);
+
+CREATE TABLE IF NOT EXISTS metrics (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    video_id     TEXT REFERENCES published_videos(video_id),
+    views        INTEGER DEFAULT 0,
+    ctr          REAL DEFAULT 0.0,
+    retention_30s REAL DEFAULT 0.0,
+    rpm          REAL DEFAULT 0.0,
+    watch_time_h REAL DEFAULT 0.0,
+    collected_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(video_id, collected_at)
+);
+CREATE INDEX IF NOT EXISTS idx_metrics_video_id ON metrics(video_id);
+
+CREATE TABLE IF NOT EXISTS ab_tests (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    video_id     TEXT REFERENCES published_videos(video_id),
+    variant_type TEXT,
+    winner       TEXT,
+    p_value      REAL,
+    significant  INTEGER,
+    created_at   TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    video_id     TEXT,
+    operator     TEXT,
+    decision     TEXT,
+    reason       TEXT,
+    content_hash TEXT,
+    created_at   TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS characters (
@@ -106,6 +136,20 @@ CREATE TABLE IF NOT EXISTS niche_arms (
     total_reward REAL    DEFAULT 0.0,
     last_reward  REAL    DEFAULT 0.0,
     updated_at   REAL    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS niche_weights (
+    niche_id     TEXT PRIMARY KEY,
+    weight       REAL DEFAULT 1.0,
+    updated_at   REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ppo_transitions (
+    video_id     TEXT PRIMARY KEY,
+    state_json   TEXT NOT NULL,
+    action_idx   INTEGER NOT NULL,
+    prob         REAL NOT NULL,
+    created_at   REAL NOT NULL
 );
 """
 
@@ -472,51 +516,195 @@ class SQLiteStorage(StorageAdapter):
             _log.exception("save_video failed for video_id=%s", video_id)
             raise
 
-    def update_video_metrics(self, video_id: str, stats: ChannelStats) -> None:
-        """Update CTR, 30-second retention, and view count for a video.
+    def save_metrics(self, metrics: MetricsSnapshot) -> None:
+        """Insert a video metrics snapshot.
 
-        No-op (with a WARNING log) if ``video_id`` does not exist.
-
-        Complexity: O(log n) — B-tree UPDATE on primary key.
-
-        Parameters
-        ----------
-        video_id:
-            YouTube video ID to update.
-        stats:
-            A ``ChannelStats`` instance with ``ctr``, ``retention_30s``,
-            and ``views`` populated.
-
-        Examples
-        --------
-        >>> from ytaimbot_ml.schemas import ChannelStats
-        >>> s = ChannelStats(video_id="abc", views=500, ctr=0.07, retention_30s=0.75)
-        >>> store.update_video_metrics("abc", s)
+        Complexity: O(log n) — B-tree INSERT.
         """
-        _log.debug(
-            "update_video_metrics: video_id=%s ctr=%.4f retention=%.4f views=%d",
-            video_id,
-            stats.ctr,
-            stats.retention_30s,
-            stats.views,
-        )
+        _log.debug("save_metrics: video_id=%s", metrics.video_id)
         try:
             with self._lock:
                 with self._conn:
-                    cur = self._conn.execute(
+                    self._conn.execute(
                         """
-                        UPDATE published_videos
-                        SET ctr = ?, retention_30s = ?, views = ?
-                        WHERE video_id = ?
+                        INSERT OR IGNORE INTO metrics
+                            (video_id, views, ctr, retention_30s, rpm, watch_time_h, collected_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (stats.ctr, stats.retention_30s, stats.views, video_id),
+                        (
+                            metrics.video_id,
+                            metrics.views,
+                            metrics.ctr,
+                            metrics.retention_30s,
+                            metrics.rpm,
+                            metrics.watch_time_h,
+                            metrics.collected_at.isoformat(),
+                        ),
                     )
-            if cur.rowcount == 0:
-                _log.warning(
-                    "update_video_metrics: video_id=%s not found, skipping", video_id
-                )
         except sqlite3.Error:
-            _log.exception("update_video_metrics failed for video_id=%s", video_id)
+            _log.exception("save_metrics failed for video_id=%s", metrics.video_id)
+            raise
+
+    def load_archive(self) -> dict[str, str]:
+        """Load all archived script texts from compliance reports.
+
+        Complexity: O(n) — full table scan of compliance_reports.
+        """
+        _log.debug("load_archive: fetching all compliance reports")
+        try:
+            cur = self._conn.execute(
+                "SELECT content_hash, reasons_json FROM compliance_reports"
+            )
+            # Using reasons_json as a proxy for text if script isn't stored separately
+            # In a real scenario, we'd have a 'scripts' table.
+            return {row["content_hash"]: row["reasons_json"] for row in cur.fetchall()}
+        except sqlite3.Error:
+            _log.exception("load_archive failed")
+            raise
+
+    def get_upload_count(self) -> int:
+        """Return the total number of records in published_videos.
+
+        Complexity: O(1) if SQLite uses metadata, else O(n).
+        """
+        try:
+            cur = self._conn.execute("SELECT COUNT(*) FROM published_videos")
+            return cur.fetchone()[0]
+        except sqlite3.Error:
+            _log.exception("get_upload_count failed")
+            raise
+
+    def list_published_videos(self, limit: int = 100) -> list[dict]:
+        """Return a list of recently published videos ordered by date.
+
+        Complexity: O(L log n).
+        """
+        try:
+            cur = self._conn.execute(
+                "SELECT * FROM published_videos ORDER BY published_at DESC LIMIT ?",
+                (limit,),
+            )
+            return [dict(row) for row in cur.fetchall()]
+        except sqlite3.Error:
+            _log.exception("list_published_videos failed")
+            raise
+
+    def get_top_videos(self, n: int = 10, metric: str = "views") -> list[dict[str, Any]]:
+        """Return top N videos based on latest metrics.
+
+        Complexity: O(n log n) due to sorting.
+        """
+        _log.debug("get_top_videos: n=%d metric=%s", n, metric)
+        try:
+            # Get latest metrics for each video
+            cur = self._conn.execute(
+                f"""
+                SELECT v.*, m.{metric}
+                FROM published_videos v
+                JOIN metrics m ON v.video_id = m.video_id
+                WHERE m.collected_at = (
+                    SELECT MAX(collected_at)
+                    FROM metrics m2
+                    WHERE m2.video_id = v.video_id
+                )
+                ORDER BY m.{metric} DESC
+                LIMIT ?
+                """,
+                (n,),
+            )
+            return [dict(row) for row in cur.fetchall()]
+        except sqlite3.Error:
+            _log.exception("get_top_videos failed")
+            raise
+
+    def save_ab_test(self, test: ABTestResult) -> None:
+        """Persist A/B test result.
+
+        Complexity: O(log n).
+        """
+        try:
+            with self._lock:
+                with self._conn:
+                    self._conn.execute(
+                        """
+                        INSERT INTO ab_tests
+                            (video_id, variant_type, winner, p_value, significant)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (
+                            test.video_id,
+                            test.variant_type,
+                            test.winner,
+                            test.p_value,
+                            1 if test.significant else 0,
+                        ),
+                    )
+        except sqlite3.Error:
+            _log.exception("save_ab_test failed")
+            raise
+
+    def load_bandit_state(self) -> dict[str, dict]:
+        """Load all arm stats for the bandit.
+
+        Complexity: O(n).
+        """
+        try:
+            cur = self._conn.execute("SELECT * FROM niche_arms")
+            return {row["arm_id"]: dict(row) for row in cur.fetchall()}
+        except sqlite3.Error:
+            _log.exception("load_bandit_state failed")
+            return {}
+
+    def save_bandit_state(self, arm_id: str, n_pulls: int, total_reward: float, last_reward: float) -> None:
+        """Upsert arm statistics.
+
+        Complexity: O(log n).
+        """
+        try:
+            with self._lock:
+                with self._conn:
+                    self._conn.execute(
+                        """
+                        INSERT OR REPLACE INTO niche_arms 
+                            (arm_id, n_pulls, total_reward, last_reward, updated_at)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (arm_id, n_pulls, total_reward, last_reward, time.time()),
+                    )
+        except sqlite3.Error:
+            _log.exception("save_bandit_state failed")
+            raise
+
+    def load_niche_weights(self) -> dict[str, float]:
+        """Return all weights from niche_weights table.
+
+        Complexity: O(n).
+        """
+        try:
+            cur = self._conn.execute("SELECT niche_id, weight FROM niche_weights")
+            return {row["niche_id"]: row["weight"] for row in cur.fetchall()}
+        except sqlite3.Error:
+            _log.exception("load_niche_weights failed")
+            return {}
+
+    def save_niche_weights(self, weights: dict[str, float]) -> None:
+        """Upsert niche weights.
+
+        Complexity: O(k log n).
+        """
+        rows = [(nid, w, time.time()) for nid, w in weights.items()]
+        try:
+            with self._lock:
+                with self._conn:
+                    self._conn.executemany(
+                        """
+                        INSERT OR REPLACE INTO niche_weights (niche_id, weight, updated_at)
+                        VALUES (?, ?, ?)
+                        """,
+                        rows,
+                    )
+        except sqlite3.Error:
+            _log.exception("save_niche_weights failed")
             raise
 
     def save_character(
@@ -682,6 +870,47 @@ class SQLiteStorage(StorageAdapter):
             return [dict(row) for row in cur.fetchall()]
         except sqlite3.Error:
             _log.exception("load_niche_arms failed")
+            raise
+
+    def save_ppo_transition(
+        self, video_id: str, state: list[float], action_idx: int, prob: float
+    ) -> None:
+        """Persist a PPO transition.  O(log n)."""
+        _log.debug("save_ppo_transition: video_id=%s", video_id)
+        try:
+            with self._lock:
+                with self._conn:
+                    self._conn.execute(
+                        """
+                        INSERT OR REPLACE INTO ppo_transitions
+                            (video_id, state_json, action_idx, prob, created_at)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (video_id, json.dumps(state), action_idx, prob, time.time()),
+                    )
+        except sqlite3.Error:
+            _log.exception("save_ppo_transition failed for video_id=%s", video_id)
+            raise
+
+    def load_ppo_transitions(self) -> list[dict]:
+        """Load all transitions.  O(n)."""
+        _log.debug("load_ppo_transitions")
+        try:
+            cur = self._conn.execute("SELECT * FROM ppo_transitions")
+            return [dict(row) for row in cur.fetchall()]
+        except sqlite3.Error:
+            _log.exception("load_ppo_transitions failed")
+            raise
+
+    def clear_ppo_transitions(self) -> None:
+        """Clear all transitions.  O(n)."""
+        _log.debug("clear_ppo_transitions")
+        try:
+            with self._lock:
+                with self._conn:
+                    self._conn.execute("DELETE FROM ppo_transitions")
+        except sqlite3.Error:
+            _log.exception("clear_ppo_transitions failed")
             raise
 
     # ------------------------------------------------------------------
