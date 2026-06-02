@@ -307,6 +307,70 @@ class ChannelStats:
 
 
 @dataclass
+class MetricsSnapshot:
+    """Historical snapshot of video metrics (time-series).
+
+    Parameters
+    ----------
+    video_id:
+        YouTube video ID.
+    views:
+        Total view count.
+    ctr:
+        Click-through rate in [0, 1].
+    retention_30s:
+        Percentage of viewers who watched past 30 seconds, in [0, 1].
+    rpm:
+        Revenue per 1,000 views (approximate).
+    watch_time_h:
+        Total watch time in hours.
+    collected_at:
+        UTC timestamp when the metrics were collected.
+    """
+
+    video_id: str
+    views: int = 0
+    ctr: float = 0.0
+    retention_30s: float = 0.0
+    rpm: float = 0.0
+    watch_time_h: float = 0.0
+    collected_at: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+
+
+@dataclass
+class ABTestResult:
+    """Result of a statistical A/B test between two variants."""
+    video_id: str
+    variant_type: str
+    winner: str = "inconclusive"
+    p_value: float = 1.0
+    significant: bool = False
+
+
+@dataclass
+class DriftReport:
+    """Result of a distribution drift detection (KS-test)."""
+    statistic: float
+    p_value: float
+    drift_detected: bool
+    action: str = "continue"
+
+
+@dataclass
+class ContentState:
+    """State vector for the PPO policy optimizer."""
+    features: np.ndarray
+
+
+@dataclass
+class ContentAction:
+    """Action vector for the PPO policy optimizer."""
+    params: dict
+
+
+@dataclass
 class PipelineResult:
     """Aggregated result of a full pipeline run."""
 
