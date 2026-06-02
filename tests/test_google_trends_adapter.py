@@ -1,121 +1,119 @@
-"""Tests for GoogleTrendsTrendSource — T-031 to T-036."""
+"""Tests for GoogleTrendsAdapter."""
 
 from __future__ import annotations
 
+import re
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
+import trendspyg # Import for mocking purposes
 
-from modules.adapters.google_trends import GoogleTrendsTrendSource
+from modules.adapters.base import TrendSourceAdapter
+from modules.adapters.errors import RetryableError # Import for simulating failures
 from ytaimbot_ml.schemas import TrendSignal
 
 
-def _make_entry(keyword: str) -> str:
-    return keyword
+# Mock RSS data for trendspyg.download_google_trends_rss
+MOCK_RSS_FEED = """<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0" xmlns:ht="http://purl.org/rss/1.0/modules/slash/">
+<channel>
+    <title>Google Trends: Trending Searches</title>
+    <link>https://trends.google.com/trends/trendingsearches/daily</link>
+    <item>
+        <title>Trend 1 Keyword</title>
+        <ht:news_item_url>https://example.com/trend1</ht:news_item_url>
+        <ht:news_item_title>News for Trend 1</ht:news_item_title>
+        <ht:news_item_source>Source 1</ht:news_item_source>
+        <ht:approx_traffic>1,000,000+</ht:approx_traffic>
+        <pubDate>Tue, 02 Jun 2026 12:00:00 GMT</pubDate>
+        <description>Description for Trend 1</description>
+    </item>
+    <item>
+        <title>Trend 2 Keyword</title>
+        <ht:news_item_url>https://example.com/trend2</ht:news_item_url>
+        <ht:news_item_title>News for Trend 2</ht:news_item_title>
+        <ht:news_item_source>Source 2</ht:news_item_source>
+        <ht:approx_traffic>500,000+</ht:approx_traffic>
+        <pubDate>Tue, 02 Jun 2026 13:00:00 GMT</pubDate>
+        <description>Description for Trend 2</description>
+    </item>
+</channel>
+</rss>
+"""
 
 
-@pytest.fixture
-def mock_trendspy_data():
-    """20 fake trending keywords."""
-    return [f"trend keyword {i}" for i in range(20)]
+class TestGoogleTrendsAdapter:
+    """Tests for the GoogleTrendsAdapter."""
 
+    @patch("trendspyg.download_google_trends_rss")
+    def test_fetch_returns_trend_signals(self, mock_download_rss: MagicMock) -> None:
+        """
+        fetch() should call trendspyg and return a list of TrendSignal objects.
+        """
+        from modules.adapters.google_trends import GoogleTrendsAdapter
 
-def test_fetch_returns_trend_signals(mock_trendspy_data):
-    """fetch() must return list[TrendSignal]."""
-    with patch.dict("sys.modules", {"trendspy": _make_trendspy_mock(mock_trendspy_data)}):
-        src = GoogleTrendsTrendSource(geo="US")
-        signals = src.fetch()
+        mock_download_rss.return_value = MOCK_RSS_FEED
+        adapter = GoogleTrendsAdapter(geo="US")
+        
+        signals = adapter.fetch()
 
-    assert isinstance(signals, list)
-    assert len(signals) >= 1
-    assert all(isinstance(s, TrendSignal) for s in signals)
+        # Verify trendspyg was called with correct arguments
+        mock_download_rss.assert_called_once_with(geo="US")
 
+        # Verify the returned data is a list of TrendSignal
+        assert isinstance(signals, list)
+        assert len(signals) == 2
+        assert all(isinstance(s, TrendSignal) for s in signals)
 
-def test_fetch_raw_score_in_range(mock_trendspy_data):
-    """All raw_scores must be in [0.0, 1.0]."""
-    with patch.dict("sys.modules", {"trendspy": _make_trendspy_mock(mock_trendspy_data)}):
-        src = GoogleTrendsTrendSource(geo="US")
-        signals = src.fetch()
+        # Verify content of the first TrendSignal
+        signal1 = signals[0]
+        assert signal1.trend_id == "trend-1-keyword"  # Should be slugified
+        assert signal1.keyword == "Trend 1 Keyword"
+        assert signal1.raw_score == 1_000_000
+        assert signal1.source == "Google Trends"
+        assert signal1.timestamp == "2026-06-02T12:00:00Z" # ISO-8601 UTC
 
-    assert all(0.0 <= s.raw_score <= 1.0 for s in signals), (
-        "raw_score out of [0.0, 1.0] range"
-    )
+        # Verify content of the second TrendSignal
+        signal2 = signals[1]
+        assert signal2.trend_id == "trend-2-keyword"
+        assert signal2.keyword == "Trend 2 Keyword"
+        assert signal2.raw_score == 500_000
+        assert signal2.source == "Google Trends"
+        assert signal2.timestamp == "2026-06-02T13:00:00Z"
+    
+    @patch("trendspyg.download_google_trends_rss")
+    @patch("time.sleep") # Mock time.sleep for backoff testing
+    @patch("modules.adapters.retry.random.random", return_value=0.0) # Correctly mock random.random where it's used
+    def test_fetch_retries_on_failure(self, mock_random: MagicMock, mock_sleep: MagicMock, mock_download_rss: MagicMock) -> None:
+        """
+        fetch() should retry on transient failures with exponential backoff and jitter.
+        """
+        from modules.adapters.google_trends import GoogleTrendsAdapter
 
+        # Simulate transient failures then success
+        mock_download_rss.side_effect = [
+            RetryableError("Transient error"),
+            RetryableError("Another transient error"),
+            MOCK_RSS_FEED, # Success on third attempt
+        ]
 
-def test_fetch_respects_max_results(mock_trendspy_data):
-    """fetch() must not exceed max_results."""
-    with patch.dict("sys.modules", {"trendspy": _make_trendspy_mock(mock_trendspy_data)}):
-        src = GoogleTrendsTrendSource(geo="US", max_results=5)
-        signals = src.fetch()
+        adapter = GoogleTrendsAdapter(geo="US")
+        
+        signals = adapter.fetch()
 
-    assert len(signals) <= 5
+        # Verify trendspyg was called 3 times
+        assert mock_download_rss.call_count == 3
+        mock_download_rss.assert_called_with(geo="US")
 
+        # Expected sleep calls for max_retries=3, base_delay=2.0, jitter=True (but random is mocked to 0.0)
+        # 1st retry delay: 2.0 * (1 + 0.0) = 2.0s
+        # 2nd retry delay: 4.0 * (1 + 0.0) = 4.0s
+        mock_sleep.assert_any_call(2.0)
+        mock_sleep.assert_any_call(4.0)
+        assert mock_sleep.call_count == 2
 
-def test_fetch_source_field(mock_trendspy_data):
-    """TrendSignal.source must be 'google_trends'."""
-    with patch.dict("sys.modules", {"trendspy": _make_trendspy_mock(mock_trendspy_data)}):
-        src = GoogleTrendsTrendSource(geo="US")
-        signals = src.fetch()
-
-    assert all(s.source == "google_trends" for s in signals)
-
-
-def test_fetch_geo_parameter():
-    """geo parameter must be passed through to trendspy."""
-    calls = []
-
-    class MockTrends:
-        def trending_now(self, geo="US"):
-            calls.append(geo)
-            return [f"kw{i}" for i in range(5)]
-
-    mock_module = MagicMock()
-    mock_module.Trends.return_value = MockTrends()
-
-    with patch.dict("sys.modules", {"trendspy": mock_module}):
-        src = GoogleTrendsTrendSource(geo="UA")
-        src.fetch()
-
-    assert calls == ["UA"]
-
-
-def test_network_error_falls_back_to_synthetic():
-    """Any network exception → fallback to SyntheticTrendSource."""
-    mock_module = MagicMock()
-    mock_module.Trends.return_value.trending_now.side_effect = ConnectionError("timeout")
-
-    with patch.dict("sys.modules", {"trendspy": mock_module}):
-        src = GoogleTrendsTrendSource(geo="US")
-        # Patch retry to not sleep
-        with patch("time.sleep"):
-            signals = src.fetch()
-
-    assert isinstance(signals, list)
-    assert len(signals) >= 1
-    assert all(isinstance(s, TrendSignal) for s in signals)
-
-
-def test_determinism_same_data():
-    """Same input entries → same output TrendSignal list."""
-    data = [f"kw{i}" for i in range(10)]
-
-    with patch.dict("sys.modules", {"trendspy": _make_trendspy_mock(data)}):
-        src1 = GoogleTrendsTrendSource(geo="US")
-        signals1 = src1.fetch()
-
-    with patch.dict("sys.modules", {"trendspy": _make_trendspy_mock(data)}):
-        src2 = GoogleTrendsTrendSource(geo="US")
-        signals2 = src2.fetch()
-
-    assert [s.keyword for s in signals1] == [s.keyword for s in signals2]
-    assert [s.raw_score for s in signals1] == [s.raw_score for s in signals2]
-
-
-# ---------------------------------------------------------------------------
-# Helper
-# ---------------------------------------------------------------------------
-
-def _make_trendspy_mock(data: list[str]) -> MagicMock:
-    mock_module = MagicMock()
-    mock_module.Trends.return_value.trending_now.return_value = data
-    return mock_module
+        # Verify success after retries
+        assert len(signals) == 2
+        assert signals[0].keyword == "Trend 1 Keyword"
