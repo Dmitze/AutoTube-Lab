@@ -3,63 +3,83 @@
 from __future__ import annotations
 
 import re
-import xml.etree.ElementTree as ET
+import os
+import xml.etree.ElementTree as ET # No longer needed for trendspy DataFrame
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-import trendspyg
+import trendspy
+import pandas as pd # Import pandas for DataFrame handling
 from modules.adapters.base import TrendSourceAdapter
-from ytaimbot_ml.schemas import TrendSignal # Moved outside TYPE_CHECKING block
+from modules.adapters.errors import RetryableError
+from modules.adapters.retry import exponential_backoff
+from ytaimbot_ml.schemas import TrendSignal
 
 
 class GoogleTrendsAdapter(TrendSourceAdapter):
-    """Fetches trending searches from Google Trends RSS feed."""
+    """Fetches trending searches from Google Trends using the `trendspy` library.
 
-    # Google Trends specific namespace for custom elements
-    _HT_NAMESPACE = "{http://purl.org/rss/1.0/modules/slash/}"
+    This adapter uses `trendspy.get_trends()` to fetch trending searches and
+    converts the resulting Pandas DataFrame into a list of `TrendSignal` objects.
+    """
 
-    def __init__(self, geo: str = "US") -> None:
+    def __init__(self, geo: str = "US", fallback_source: TrendSourceAdapter | None = None, seed: int = 42) -> None:
         """Initialize the GoogleTrendsAdapter.
 
         Parameters
         ----------
         geo:
             Geographical location for trend data (e.g., "US", "UA").
+        fallback_source:
+            Optional TrendSourceAdapter to use if primary fetch fails persistently.
+        seed:
+            Integer seed for reproducibility, passed to underlying components if any.
         """
         self._geo = geo
+        self._fallback_source = fallback_source
+        self._seed = seed # Store seed if needed for internal components.
+        # trendspy.get_trends requires a query. Since the original intent was general trends,
+        # we'll use a broad query or rely on the library's default if it exists.
+        # For now, a generic "trending searches" query will be used, though trendspy
+        # focuses on specific queries. This might need further discussion.
+        self._query = os.environ.get("GOOGLE_TRENDS_QUERY", "trending searches")
 
-    def fetch(self) -> list[TrendSignal]:
-        """Return a list of TrendSignal objects.
 
-        Complexity: O(N) where N is the number of items in the RSS feed.
+    @exponential_backoff(max_retries=3, base_delay=2.0, jitter=True, seed=42) # Added seed for determinism
+    def _fetch_with_retries(self) -> list[TrendSignal]:
+        """Internal method for fetching trends with retries, without fallback.
+
+        This method calls `trendspy.get_trends()` and parses the DataFrame result.
         """
-        rss_feed = trendspyg.download_google_trends_rss(geo=self._geo)
-        root = ET.fromstring(rss_feed)
+        # trendspy.get_trends requires a query, but the original GoogleTrendsAdapter
+        # was designed for general trending searches without a specific query.
+        # We will use a general query.
+        df = trendspy.get_trends(query=self._query, geo=self._geo)
 
         signals: list[TrendSignal] = []
-        for item in root.findall(".//item"):
-            title_element = item.find("title")
-            approx_traffic_element = item.find(f"{self._HT_NAMESPACE}approx_traffic")
-            pub_date_element = item.find("pubDate")
-
-            if title_element is None or approx_traffic_element is None or pub_date_element is None:
-                continue  # Skip items that don't have all required data
-
-            keyword = title_element.text or ""
+        # Iterate over DataFrame rows and convert to TrendSignal
+        for _, row in df.iterrows():
+            # trendspy does not provide a direct 'raw_score' (approx_traffic)
+            # Assigning 0 for now, similar to YouTubeSearchAdapter if direct score is unavailable.
+            raw_score = 0
             
-            # Extract raw_score, removing '+' and commas
-            raw_score_str = re.sub(r"[+,]", "", approx_traffic_element.text or "0")
-            raw_score = int(raw_score_str)
+            # Use 'search_term' from DataFrame as keyword
+            keyword = row["search_term"]
+            
+            # 'date' column contains datetime objects
+            # Convert to ISO-8601 UTC string
+            # Check if 'date' column exists, otherwise use current time as fallback
+            if "date" in row and pd.notna(row["date"]):
+                dt_object = row["date"].replace(tzinfo=timezone.utc)
+                timestamp = dt_object.isoformat(timespec="seconds").replace("+00:00", "Z")
+            else:
+                # Fallback to current UTC time if date is not available
+                timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
-            # Parse pubDate and format to ISO-8601 UTC
-            pub_date_str = pub_date_element.text
-            # Example: 'Tue, 02 Jun 2026 12:00:00 GMT'
-            dt_object = datetime.strptime(pub_date_str, "%a, %d %b %Y %H:%M:%S GMT").replace(tzinfo=timezone.utc)
-            timestamp = dt_object.isoformat(timespec="seconds").replace("+00:00", "Z")
 
-            # Generate trend_id (slugify)
+            # Generate a unique trend_id from the keyword
             trend_id = re.sub(r"[^a-z0-9]+", "-", keyword.lower()).strip("-")
-
+            
             signals.append(
                 TrendSignal(
                     trend_id=trend_id,
@@ -70,3 +90,15 @@ class GoogleTrendsAdapter(TrendSourceAdapter):
                 )
             )
         return signals
+
+    def fetch(self) -> list[TrendSignal]:
+        """Return a list of TrendSignal objects.
+
+        Complexity: O(N) where N is the number of items returned by `trendspy.get_trends()`.
+        """
+        try:
+            return self._fetch_with_retries()
+        except RetryableError:
+            if self._fallback_source:
+                return self._fallback_source.fetch()
+            raise

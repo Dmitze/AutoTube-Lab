@@ -86,7 +86,7 @@ def build_trend_source(seed: int = 42) -> TrendSourceAdapter:
     +--------------------------+----------------------------+
     | Yes                      | Yes → CompositeTrendSource  |
     | Yes                      | No  → YouTubeSearchTrendSource |
-    | No                       | Yes → GoogleTrendsTrendSource |
+    | No                       | Yes → GoogleTrendsAdapter |
     | No                       | No  → SyntheticTrendSource  |
     +--------------------------+----------------------------+
 
@@ -116,7 +116,7 @@ def build_trend_source(seed: int = 42) -> TrendSourceAdapter:
 
     if has_yt and has_gt:
         from modules.adapters.composite import CompositeTrendSource
-        from modules.adapters.google_trends import GoogleTrendsTrendSource
+        from modules.adapters.google_trends import GoogleTrendsAdapter
         from modules.adapters.youtube_search import YouTubeSearchTrendSource
 
         geo = os.environ["GOOGLE_TRENDS_GEO"]
@@ -127,7 +127,7 @@ def build_trend_source(seed: int = 42) -> TrendSourceAdapter:
         logger.info("TrendSource: CompositeTrendSource (GoogleTrends + YouTube)")
         return CompositeTrendSource(
             adapters=[
-                (GoogleTrendsTrendSource(geo=geo, seed=seed), w_gt),
+                (GoogleTrendsAdapter(geo=geo, seed=seed), w_gt),
                 (YouTubeSearchTrendSource(seed=seed), w_yt),
             ],
             cache_ttl=int(os.environ.get("TREND_CACHE_TTL", "900")),
@@ -140,10 +140,10 @@ def build_trend_source(seed: int = 42) -> TrendSourceAdapter:
         return YouTubeSearchTrendSource(seed=seed)
 
     if has_gt:
-        from modules.adapters.google_trends import GoogleTrendsTrendSource
+        from modules.adapters.google_trends import GoogleTrendsAdapter
         geo = os.environ["GOOGLE_TRENDS_GEO"]
-        logger.info("TrendSource: GoogleTrendsTrendSource (geo=%s)", geo)
-        return GoogleTrendsTrendSource(geo=geo, seed=seed)
+        logger.info("TrendSource: GoogleTrendsAdapter (geo=%s)", geo)
+        return GoogleTrendsAdapter(geo=geo, seed=seed)
 
     from modules.adapters.synthetic import SyntheticTrendSource
     logger.info("TrendSource: SyntheticTrendSource (no API keys configured)")

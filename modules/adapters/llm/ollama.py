@@ -23,7 +23,8 @@ import os
 import httpx
 
 from modules.adapters.base import LLMAdapter
-from modules.adapters.retry import NonRetryableError, RetryableError, retry
+from modules.adapters.errors import NonRetryableError, RetryableError # Corrected import path
+from modules.adapters.retry import exponential_backoff as retry # Correctly import retry decorator
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ class OllamaAdapter(LLMAdapter):
         self.url = (url or os.environ.get("OLLAMA_URL", _DEFAULT_OLLAMA_URL)).rstrip("/")
         self.model = model or os.environ.get("OLLAMA_MODEL", _DEFAULT_OLLAMA_MODEL)
 
-    @retry(max_retries=2, base_delay=3.0, seed=42)
+    @retry(max_retries=2, base_delay=3.0, jitter=True, seed=42) # Added jitter=True for consistency
     def generate(self, prompt: str, max_tokens: int = 512) -> str:
         """Generate text via Ollama /api/generate endpoint.
 
@@ -206,4 +207,3 @@ class LLMFallbackChain(LLMAdapter):
         raise RuntimeError(
             f"All LLM adapters failed. Last error: {last_exc}"
         ) from last_exc
-

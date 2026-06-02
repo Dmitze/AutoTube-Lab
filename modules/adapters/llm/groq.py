@@ -30,7 +30,8 @@ import logging
 import os
 
 from modules.adapters.base import LLMAdapter
-from modules.adapters.retry import NonRetryableError, RetryableError, retry
+from modules.adapters.errors import NonRetryableError, RetryableError # Corrected import path
+from modules.adapters.retry import exponential_backoff as retry # Correctly import retry decorator
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ class GroqAdapter(LLMAdapter):
                 "GROQ_API_KEY not set — GroqAdapter will fail on generate()"
             )
 
-    @retry(max_retries=3, base_delay=2.0, seed=42)
+    @retry(max_retries=3, base_delay=2.0, jitter=True, seed=42) # Added jitter=True
     def generate(self, prompt: str, max_tokens: int = 512) -> str:
         """Generate text via Groq API.
 
@@ -176,4 +177,3 @@ class GroqAdapter(LLMAdapter):
             len(truncated),
         )
         return truncated + " [...]"
-

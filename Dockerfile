@@ -15,6 +15,7 @@ RUN pip install -e .
 
 RUN addgroup --system --gid 1001 ytaimbot \
  && adduser  --system --uid 1001 --ingroup ytaimbot --no-create-home ytaimbot \
+ && mkdir -p /data \
  && chown -R ytaimbot:ytaimbot /app /data
 USER ytaimbot
 

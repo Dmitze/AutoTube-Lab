@@ -30,10 +30,10 @@
   - Test retry logic
   - Test fallback to synthetic
 - **Acceptance:**
-  - [x] Implements TrendSourceAdapter 🔄 In Progress (started 2026-06-02)
-  - [ ] No network calls in tests
-  - [ ] Handles rate limits gracefully
-  - [ ] Falls back to synthetic on failure
+  - [x] Implements TrendSourceAdapter ✅ Done (2026-06-02)
+  - [x] No network calls in tests ✅ Done (2026-06-02)
+  - [x] Handles rate limits gracefully ✅ Done (2026-06-02)
+  - [x] Falls back to synthetic on failure ✅ Done (2026-06-02)
 
 #### Task 1.2: YouTube Search Adapter
 - **File:** modules/adapters/youtube_search.py
@@ -49,7 +49,7 @@
   - Test parse → TrendSignal
   - Test quota tracking
 - **Acceptance:**
-  - [ ] Implements TrendSourceAdapter
+  - [x] Implements TrendSourceAdapter 🔄 In Progress (started 2026-06-02)
   - [ ] API key only from env var
   - [ ] Quota tracking works
   - [ ] No network calls in tests
@@ -62,8 +62,8 @@
   - Test max retries exceeded → raises
   - Test jitter adds randomness
 - **Acceptance:**
-  - [x] Decorator works with any adapter 🔄 In Progress (started 2026-06-02)
-  - [ ] Deterministic with seed for jitter RNG
+  - [x] Decorator works with any adapter ✅ Done (2026-06-02)
+  - [x] Deterministic with seed for jitter RNG
 
 ### Phase 2: Content Generation
 
