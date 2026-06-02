@@ -1,164 +1,72 @@
-"""Google Trends adapter using trendspy RSS feed.
-
-Algorithm
----------
-RSS Parsing + Normalization (T-025 – T-030):
-    1. Fetch RSS via trendspy (no auth required, free)
-    2. Parse entries: title → keyword, rank → raw_score
-    3. Normalize: raw_score = 1.0 - (rank / total)  → [0.0, 1.0]
-    4. Fallback to SyntheticTrendSource on any network error
-
-Complexity: O(n) where n = number of RSS entries
-
-Usage
------
-    from modules.adapters.google_trends import GoogleTrendsTrendSource
-    source = GoogleTrendsTrendSource(geo="US")
-    signals = source.fetch()  # list[TrendSignal]
-"""
+"""Google Trends adapter for fetching trend signals."""
 
 from __future__ import annotations
 
-import logging
-import os
+import re
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
+import trendspyg
 from modules.adapters.base import TrendSourceAdapter
-from modules.adapters.retry import RetryableError, retry
-from modules.adapters.synthetic import SyntheticTrendSource
-from ytaimbot_ml.schemas import TrendSignal
-
-logger = logging.getLogger(__name__)
-
-_DEFAULT_GEO = "US"
-_DEFAULT_MAX_RESULTS = 25
+from ytaimbot_ml.schemas import TrendSignal # Moved outside TYPE_CHECKING block
 
 
-class GoogleTrendsTrendSource(TrendSourceAdapter):
-    """Fetch trending search topics from Google Trends RSS.
+class GoogleTrendsAdapter(TrendSourceAdapter):
+    """Fetches trending searches from Google Trends RSS feed."""
 
-    Parameters
-    ----------
-    geo:
-        Two-letter country code, e.g. ``"US"``, ``"UA"``, ``"GB"``.
-        Defaults to ``GOOGLE_TRENDS_GEO`` env var or ``"US"``.
-    max_results:
-        Maximum number of TrendSignal objects to return.
-    seed:
-        Seed for the synthetic fallback source.
+    # Google Trends specific namespace for custom elements
+    _HT_NAMESPACE = "{http://purl.org/rss/1.0/modules/slash/}"
 
-    Complexity
-    ----------
-    fetch(): O(n) where n = number of RSS entries returned by trendspy.
+    def __init__(self, geo: str = "US") -> None:
+        """Initialize the GoogleTrendsAdapter.
 
-    Examples
-    --------
-    >>> src = GoogleTrendsTrendSource(geo="US")
-    >>> signals = src.fetch()
-    >>> assert all(0.0 <= s.raw_score <= 1.0 for s in signals)
-    """
-
-    def __init__(
-        self,
-        geo: str | None = None,
-        max_results: int = _DEFAULT_MAX_RESULTS,
-        seed: int = 42,
-    ) -> None:
-        self._geo = geo or os.environ.get("GOOGLE_TRENDS_GEO", _DEFAULT_GEO)
-        self._max_results = max_results
-        self._fallback = SyntheticTrendSource(seed=seed)
+        Parameters
+        ----------
+        geo:
+            Geographical location for trend data (e.g., "US", "UA").
+        """
+        self._geo = geo
 
     def fetch(self) -> list[TrendSignal]:
-        """Return trending TrendSignals from Google Trends RSS.
+        """Return a list of TrendSignal objects.
 
-        Falls back to SyntheticTrendSource when network is unavailable
-        or all retries are exhausted.
-
-        Complexity: O(n)
+        Complexity: O(N) where N is the number of items in the RSS feed.
         """
-        try:
-            return self._fetch_from_rss()
-        except Exception as exc:
-            logger.warning(
-                "GoogleTrends fetch failed (%s); falling back to synthetic", exc
-            )
-            return self._fallback.fetch()
+        rss_feed = trendspyg.download_google_trends_rss(geo=self._geo)
+        root = ET.fromstring(rss_feed)
 
-    # ------------------------------------------------------------------
-    # Private helpers
-    # ------------------------------------------------------------------
-
-    @retry(max_retries=3, base_delay=2.0, seed=42)
-    def _fetch_from_rss(self) -> list[TrendSignal]:
-        """Parse trendspy RSS → list[TrendSignal].
-
-        Raises
-        ------
-        RetryableError
-            On 429 / 5xx / network timeout.
-        """
-        try:
-            import trendspy  # noqa: PLC0415 — optional dep
-        except ImportError as exc:
-            logger.warning("trendspy not installed: %s", exc)
-            return self._fallback.fetch()
-
-        try:
-            trends = trendspy.Trends()
-            data = trends.trending_now(geo=self._geo)
-        except Exception as exc:
-            _msg = str(exc).lower()
-            if any(kw in _msg for kw in ("429", "rate", "timeout", "connection")):
-                raise RetryableError(f"Google Trends rate-limited: {exc}") from exc
-            raise
-
-        entries = data if isinstance(data, list) else []
-        signals = self._parse_entries(entries)
-        logger.info(
-            "GoogleTrends: fetched %d signals (geo=%s)", len(signals), self._geo
-        )
-        return signals[: self._max_results]
-
-    def _parse_entries(self, entries: list) -> list[TrendSignal]:
-        """Convert raw trendspy entries → list[TrendSignal].
-
-        Normalization: raw_score = 1.0 - (rank / total)
-        So rank 0 (most trending) → score 1.0.
-
-        Complexity: O(n)
-        """
-        total = max(len(entries), 1)
-        now = datetime.now(timezone.utc).isoformat()
         signals: list[TrendSignal] = []
+        for item in root.findall(".//item"):
+            title_element = item.find("title")
+            approx_traffic_element = item.find(f"{self._HT_NAMESPACE}approx_traffic")
+            pub_date_element = item.find("pubDate")
 
-        for rank, entry in enumerate(entries):
-            keyword = self._extract_keyword(entry)
-            if not keyword:
-                continue
+            if title_element is None or approx_traffic_element is None or pub_date_element is None:
+                continue  # Skip items that don't have all required data
 
-            raw_score = 1.0 - (rank / total)
+            keyword = title_element.text or ""
+            
+            # Extract raw_score, removing '+' and commas
+            raw_score_str = re.sub(r"[+,]", "", approx_traffic_element.text or "0")
+            raw_score = int(raw_score_str)
+
+            # Parse pubDate and format to ISO-8601 UTC
+            pub_date_str = pub_date_element.text
+            # Example: 'Tue, 02 Jun 2026 12:00:00 GMT'
+            dt_object = datetime.strptime(pub_date_str, "%a, %d %b %Y %H:%M:%S GMT").replace(tzinfo=timezone.utc)
+            timestamp = dt_object.isoformat(timespec="seconds").replace("+00:00", "Z")
+
+            # Generate trend_id (slugify)
+            trend_id = re.sub(r"[^a-z0-9]+", "-", keyword.lower()).strip("-")
 
             signals.append(
                 TrendSignal(
-                    trend_id=f"gt_{keyword.lower().replace(' ', '_')}_{rank}",
+                    trend_id=trend_id,
                     keyword=keyword,
-                    raw_score=float(raw_score),
-                    source="google_trends",
-                    timestamp=now,
+                    raw_score=raw_score,
+                    source="Google Trends",
+                    timestamp=timestamp,
                 )
             )
-
         return signals
-
-    @staticmethod
-    def _extract_keyword(entry: object) -> str:
-        """Extract keyword string from a trendspy entry (flexible format)."""
-        if isinstance(entry, str):
-            return entry.strip()
-        if hasattr(entry, "keyword"):
-            return str(entry.keyword).strip()
-        if hasattr(entry, "title"):
-            return str(entry.title).strip()
-        if isinstance(entry, dict):
-            return str(entry.get("keyword") or entry.get("title", "")).strip()
-        return str(entry).strip()
