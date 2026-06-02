@@ -30,7 +30,7 @@
   - Test retry logic
   - Test fallback to synthetic
 - **Acceptance:**
-  - [ ] Implements TrendSourceAdapter
+  - [x] Implements TrendSourceAdapter 🔄 In Progress (started 2026-06-02)
   - [ ] No network calls in tests
   - [ ] Handles rate limits gracefully
   - [ ] Falls back to synthetic on failure
@@ -62,7 +62,7 @@
   - Test max retries exceeded → raises
   - Test jitter adds randomness
 - **Acceptance:**
-  - [ ] Decorator works with any adapter
+  - [x] Decorator works with any adapter 🔄 In Progress (started 2026-06-02)
   - [ ] Deterministic with seed for jitter RNG
 
 ### Phase 2: Content Generation
