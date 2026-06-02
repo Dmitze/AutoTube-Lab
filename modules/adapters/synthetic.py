@@ -6,10 +6,42 @@ memory.  They never make network calls.
 
 from __future__ import annotations
 
+import json
+import time
+from datetime import datetime, timezone
+from typing import Any
+
 import numpy as np
 
 from modules.adapters.base import PublisherAdapter, StorageAdapter, TrendSourceAdapter
-from ytaimbot_ml.schemas import ComplianceReport, ContentPlan, TrendSignal
+from ytaimbot_ml.schemas import (
+    ABTestResult,
+    ComplianceReport,
+    ContentPlan,
+    MetricsSnapshot,
+    TrendSignal,
+)
+
+
+class SyntheticMetricsCollector:
+    """Mock metrics collector that returns data from storage or generated values."""
+
+    def __init__(self, storage: InMemoryStorage) -> None:
+        self._storage = storage
+
+    def collect(self, video_id: str, published_at: datetime) -> MetricsSnapshot:
+        # Check storage first
+        for m in self._storage._metrics:
+            if m.video_id == video_id:
+                return m
+        # Default mock
+        return MetricsSnapshot(
+            video_id=video_id,
+            views=1000,
+            ctr=0.05,
+            retention_30s=0.7,
+            collected_at=datetime.now(timezone.utc)
+        )
 
 
 class SyntheticTrendSource(TrendSourceAdapter):
@@ -55,6 +87,11 @@ class InMemoryStorage(StorageAdapter):
         self._runs: dict[str, str] = {}
         self._trends: dict[str, list[TrendSignal]] = {}
         self._compliance: dict[str, list[ComplianceReport]] = {}
+        self._videos: dict[str, dict] = {}
+        self._metrics: list[MetricsSnapshot] = []
+        self._niche_arms: dict[str, dict] = {}
+        self._niche_weights: dict[str, float] = {}
+        self._ppo_transitions: dict[str, dict] = {}
 
     # --- StorageAdapter interface ---
 
@@ -68,6 +105,66 @@ class InMemoryStorage(StorageAdapter):
         self, run_id: str, reports: list[ComplianceReport]
     ) -> None:
         self._compliance[run_id] = list(reports)
+
+    def save_video(self, video_id: str, trend_id: str, title: str, privacy_status: str = "unlisted", published_at: float | None = None) -> None:
+        self._videos[video_id] = {
+            "video_id": video_id,
+            "trend_id": trend_id,
+            "title": title,
+            "privacy_status": privacy_status,
+            "published_at": published_at if published_at is not None else time.time(),
+        }
+
+    def save_metrics(self, metrics: MetricsSnapshot) -> None:
+        self._metrics.append(metrics)
+
+    def load_archive(self) -> dict[str, str]:
+        return {r.content_hash: " ".join(r.reasons) for reports in self._compliance.values() for r in reports}
+
+    def get_upload_count(self) -> int:
+        return len(self._videos)
+
+    def list_published_videos(self, limit: int = 100) -> list[dict]:
+        return sorted(self._videos.values(), key=lambda v: v["published_at"], reverse=True)[:limit]
+
+    def load_niche_weights(self) -> dict[str, float]:
+        return self._niche_weights
+
+    def save_niche_weights(self, weights: dict[str, float]) -> None:
+        self._niche_weights.update(weights)
+
+    def load_bandit_state(self) -> dict[str, dict]:
+        return self._niche_arms
+
+    def save_bandit_state(self, arm_id: str, n_pulls: int, total_reward: float, last_reward: float) -> None:
+        self._niche_arms[arm_id] = {
+            "arm_id": arm_id,
+            "n_pulls": n_pulls,
+            "total_reward": total_reward,
+            "last_reward": last_reward,
+            "updated_at": time.time(),
+        }
+
+    # Backward compatibility aliases for existing orchestrator calls if needed
+    def load_niche_arms(self) -> list[dict[str, Any]]:
+        return list(self._niche_arms.values())
+
+    def upsert_niche_arm(self, arm_id: str, n_pulls: int, total_reward: float, last_reward: float) -> None:
+        self.save_bandit_state(arm_id, n_pulls, total_reward, last_reward)
+
+    def save_ppo_transition(self, video_id: str, state: list[float], action_idx: int, prob: float) -> None:
+        self._ppo_transitions[video_id] = {
+            "video_id": video_id,
+            "state_json": json.dumps(state),
+            "action_idx": action_idx,
+            "prob": prob,
+        }
+
+    def load_ppo_transitions(self) -> list[dict]:
+        return list(self._ppo_transitions.values())
+
+    def clear_ppo_transitions(self) -> None:
+        self._ppo_transitions.clear()
 
     # --- Inspection helpers (not part of the ABC) ---
 
