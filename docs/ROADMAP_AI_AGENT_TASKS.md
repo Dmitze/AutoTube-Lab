@@ -759,19 +759,19 @@ MAX_DELAY = 30s (капуємо)
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-016 | 🔲 | Створити модуль retry з exponential backoff | `modules/adapters/retry.py` | M | T-006 | — |
-| T-017 | 🔲 | Реалізувати декоратор `@retry(max_retries, base_delay, jitter)` | `modules/adapters/retry.py` | M | T-016 | — |
-| T-018 | 🔲 | Реалізувати `RetryableError` та `NonRetryableError` exceptions | `modules/adapters/retry.py` | S | T-016 | — |
-| T-019 | 🔲 | Написати тести для retry декоратора (mock time.sleep) | `tests/test_retry.py` | M | T-017, T-018 | — |
-| T-020 | 🔲 | Тест: перевірити затримки (2s → 4s → 8s) | `tests/test_retry.py` | S | T-019 | — |
-| T-021 | 🔲 | Тест: перевірити max_retries (зупиняється після N спроб) | `tests/test_retry.py` | S | T-019 | — |
-| T-022 | 🔲 | Тест: NonRetryableError не ретраїться | `tests/test_retry.py` | S | T-019 | — |
-| T-023 | 🔲 | Тест: jitter детермінований при seed=42 | `tests/test_retry.py` | S | T-019 | — |
+| T-016 | ✅ | Створити модуль retry з exponential backoff | `modules/adapters/retry.py` | M | T-006 | 2026-03-22 |
+| T-017 | ✅ | Реалізувати декоратор `@retry(max_retries, base_delay, jitter)` | `modules/adapters/retry.py` | M | T-016 | 2026-03-22 |
+| T-018 | ✅ | Реалізувати `RetryableError` та `NonRetryableError` exceptions | `modules/adapters/retry.py` | S | T-016 | 2026-03-22 |
+| T-019 | ✅ | Написати тести для retry декоратора (mock time.sleep) | `tests/test_retry.py` | M | T-017, T-018 | 2026-03-22 |
+| T-020 | ✅ | Тест: перевірити затримки (2s → 4s → 8s) | `tests/test_retry.py` | S | T-019 | 2026-03-22 |
+| T-021 | ✅ | Тест: перевірити max_retries (зупиняється після N спроб) | `tests/test_retry.py` | S | T-019 | 2026-03-22 |
+| T-022 | ✅ | Тест: NonRetryableError не ретраїться | `tests/test_retry.py` | S | T-019 | 2026-03-22 |
+| T-023 | ✅ | Тест: jitter детермінований при seed=42 | `tests/test_retry.py` | S | T-019 | 2026-03-22 |
 
 **Acceptance для EPIC 1.1:**
-- [ ] `@retry` декоратор працює з будь-яким адаптером
-- [ ] `time.sleep` замоканий у тестах (не чекаємо реально)
-- [ ] Jitter детермінований коли передано seed
+- [x] `@retry` декоратор працює з будь-яким адаптером
+- [x] `time.sleep` замоканий у тестах (не чекаємо реально)
+- [x] Jitter детермінований коли передано seed
 
 ---
 
@@ -796,25 +796,25 @@ TrendSignal(
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-024 | 🔲 | Додати `trendspyg` до pyproject.toml | `pyproject.toml` | S | T-001 | — |
-| T-025 | 🔲 | Створити `GoogleTrendsTrendSource` клас | `modules/adapters/google_trends.py` | M | T-006, T-016 | — |
-| T-026 | 🔲 | Реалізувати `fetch()` — RSS парсинг → list[TrendSignal] | `modules/adapters/google_trends.py` | L | T-025 | — |
-| T-027 | 🔲 | Реалізувати geo параметр (US, UA, GB — конфігурується) | `modules/adapters/google_trends.py` | S | T-026 | — |
-| T-028 | 🔲 | Реалізувати normalize — rank → float [0.0, 1.0] | `modules/adapters/google_trends.py` | S | T-026 | — |
-| T-029 | 🔲 | Додати `@retry` декоратор до fetch() | `modules/adapters/google_trends.py` | S | T-017, T-026 | — |
-| T-030 | 🔲 | Реалізувати fallback → SyntheticTrendSource | `modules/adapters/google_trends.py` | M | T-029 | — |
-| T-031 | 🔲 | Написати тести (mock trendspyg.download_rss) | `tests/test_google_trends_adapter.py` | M | T-025 | — |
-| T-032 | 🔲 | Тест: fetch() повертає list[TrendSignal] ≥ 10 елементів | `tests/test_google_trends_adapter.py` | S | T-031 | — |
-| T-033 | 🔲 | Тест: raw_score в діапазоні [0.0, 1.0] | `tests/test_google_trends_adapter.py` | S | T-031 | — |
-| T-034 | 🔲 | Тест: 429/500 помилка → fallback до synthetic | `tests/test_google_trends_adapter.py` | M | T-031 | — |
-| T-035 | 🔲 | Тест: geo параметр передається в RSS запит | `tests/test_google_trends_adapter.py` | S | T-031 | — |
-| T-036 | 🔲 | Тест: детермінізм при однакових даних | `tests/test_google_trends_adapter.py` | S | T-031 | — |
+| T-024 | ✅ | Додати `trendspyg` до pyproject.toml | `pyproject.toml` | S | T-001 | 2026-03-22 |
+| T-025 | ✅ | Створити `GoogleTrendsTrendSource` клас | `modules/adapters/google_trends.py` | M | T-006, T-016 | 2026-03-22 |
+| T-026 | ✅ | Реалізувати `fetch()` — RSS парсинг → list[TrendSignal] | `modules/adapters/google_trends.py` | L | T-025 | 2026-03-22 |
+| T-027 | ✅ | Реалізувати geo параметр (US, UA, GB — конфігурується) | `modules/adapters/google_trends.py` | S | T-026 | 2026-03-22 |
+| T-028 | ✅ | Реалізувати normalize — rank → float [0.0, 1.0] | `modules/adapters/google_trends.py` | S | T-026 | 2026-03-22 |
+| T-029 | ✅ | Додати `@retry` декоратор до fetch() | `modules/adapters/google_trends.py` | S | T-017, T-026 | 2026-03-22 |
+| T-030 | ✅ | Реалізувати fallback → SyntheticTrendSource | `modules/adapters/google_trends.py` | M | T-029 | 2026-03-22 |
+| T-031 | ✅ | Написати тести (mock trendspyg.download_rss) | `tests/test_google_trends_adapter.py` | M | T-025 | 2026-03-22 |
+| T-032 | ✅ | Тест: fetch() повертає list[TrendSignal] ≥ 10 елементів | `tests/test_google_trends_adapter.py` | S | T-031 | 2026-03-22 |
+| T-033 | ✅ | Тест: raw_score в діапазоні [0.0, 1.0] | `tests/test_google_trends_adapter.py` | S | T-031 | 2026-03-22 |
+| T-034 | ✅ | Тест: 429/500 помилка → fallback до synthetic | `tests/test_google_trends_adapter.py` | M | T-031 | 2026-03-22 |
+| T-035 | ✅ | Тест: geo параметр передається в RSS запит | `tests/test_google_trends_adapter.py` | S | T-031 | 2026-03-22 |
+| T-036 | ✅ | Тест: детермінізм при однакових даних | `tests/test_google_trends_adapter.py` | S | T-031 | 2026-03-22 |
 
 **Acceptance для EPIC 1.2:**
-- [ ] Реалізує `TrendSourceAdapter` ABC
-- [ ] Ніяких реальних мережевих викликів у тестах
-- [ ] Обробляє rate limits (429) та серверні помилки (500)
-- [ ] Graceful fallback до synthetic при будь-якій помилці
+- [x] Реалізує `TrendSourceAdapter` ABC
+- [x] Ніяких реальних мережевих викликів у тестах
+- [x] Обробляє rate limits (429) та серверні помилки (500)
+- [x] Graceful fallback до synthetic при будь-якій помилці
 
 ---
 
@@ -846,17 +846,17 @@ QuotaTracker:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-037 | 🔲 | Додати `google-api-python-client` до pyproject.toml | `pyproject.toml` | S | T-001 | — |
-| T-038 | 🔲 | Створити `QuotaTracker` клас (Sliding Window) | `modules/adapters/youtube_search.py` | M | T-037 | — |
-| T-039 | 🔲 | Реалізувати `YouTubeSearchTrendSource` клас | `modules/adapters/youtube_search.py` | M | T-006, T-038 | — |
-| T-040 | 🔲 | Реалізувати `fetch()` — search.list → list[TrendSignal] | `modules/adapters/youtube_search.py` | L | T-039 | — |
-| T-041 | 🔲 | Реалізувати quota-aware виклик (перевірка перед запитом) | `modules/adapters/youtube_search.py` | M | T-038, T-040 | — |
-| T-042 | 🔲 | Реалізувати логування quota використання (INFO) | `modules/adapters/youtube_search.py` | S | T-041 | — |
-| T-043 | 🔲 | Реалізувати fallback → SyntheticTrendSource при quota exceeded | `modules/adapters/youtube_search.py` | M | T-041 | — |
-| T-044 | 🔲 | Додати `@retry` до YouTube API викликів | `modules/adapters/youtube_search.py` | S | T-017, T-040 | — |
-| T-045 | 🔲 | Написати тести (mock googleapiclient) | `tests/test_youtube_search_adapter.py` | M | T-039 | — |
-| T-046 | 🔲 | Тест: fetch() повертає list[TrendSignal] | `tests/test_youtube_search_adapter.py` | S | T-045 | — |
-| T-047 | 🔲 | Тест: quota exceeded → fallback до synthetic | `tests/test_youtube_search_adapter.py` | M | T-045 | — |
+| T-037 | ✅ | Додати `google-api-python-client` до pyproject.toml | `pyproject.toml` | S | T-001 | 2026-03-22 |
+| T-038 | ✅ | Створити `QuotaTracker` клас (Sliding Window) | `modules/adapters/youtube_search.py` | M | T-037 | 2026-03-22 |
+| T-039 | ✅ | Реалізувати `YouTubeSearchTrendSource` клас | `modules/adapters/youtube_search.py` | M | T-006, T-038 | 2026-03-22 |
+| T-040 | ✅ | Реалізувати `fetch()` — search.list → list[TrendSignal] | `modules/adapters/youtube_search.py` | L | T-039 | 2026-03-22 |
+| T-041 | ✅ | Реалізувати quota-aware виклик (перевірка перед запитом) | `modules/adapters/youtube_search.py` | M | T-038, T-040 | 2026-03-22 |
+| T-042 | ✅ | Реалізувати логування quota використання (INFO) | `modules/adapters/youtube_search.py` | S | T-041 | 2026-03-22 |
+| T-043 | ✅ | Реалізувати fallback → SyntheticTrendSource при quota exceeded | `modules/adapters/youtube_search.py` | M | T-041 | 2026-03-22 |
+| T-044 | ✅ | Додати `@retry` до YouTube API викликів | `modules/adapters/youtube_search.py` | S | T-017, T-040 | 2026-03-22 |
+| T-045 | ✅ | Написати тести (mock googleapiclient) | `tests/test_youtube_search_adapter.py` | M | T-039 | 2026-03-22 |
+| T-046 | ✅ | Тест: fetch() повертає list[TrendSignal] | `tests/test_youtube_search_adapter.py` | S | T-045 | 2026-03-22 |
+| T-047 | ✅ | Тест: quota exceeded → fallback до synthetic | `tests/test_youtube_search_adapter.py` | M | T-045 | 2026-03-22 |
 | T-048 | 🔲 | Тест: API ключ відсутній → ValueError з корисним повідомленням | `tests/test_youtube_search_adapter.py` | S | T-045 | — |
 | T-049 | 🔲 | Тест: QuotaTracker рахує units правильно | `tests/test_youtube_search_adapter.py` | M | T-045 | — |
 | T-050 | 🔲 | Тест: QuotaTracker скидає після window_size | `tests/test_youtube_search_adapter.py` | M | T-045 | — |
@@ -1051,14 +1051,14 @@ token_budget_dp(sections: list[str], max_tokens: int) -> list[int]:
 | T-092 | ✅ | Тест: generate() повертає непорожній string | `tests/unit/test_free_tier_stack.py` | S | T-091 | 2026-W5 |
 | T-093 | ✅ | Тест: 429 → RetryableError, 403 → NonRetryableError | `tests/unit/test_free_tier_stack.py` | M | T-091 | 2026-W5 |
 | T-094 | ✅ | Тест: відсутній API ключ → ValueError | `tests/unit/test_free_tier_stack.py` | S | T-091 | 2026-W5 |
-| T-095 | 🔲 | Реалізувати `OllamaAdapter` (optional self-hosted fallback) | `modules/adapters/llm/ollama.py` | M | T-082 | — |
+| T-095 | ✅ | Реалізувати `OllamaAdapter` (optional self-hosted fallback) | `modules/adapters/llm/ollama.py` | M | T-082 | 2026-03-22 |
 
 **Acceptance для EPIC 2.1:**
 - [x] GroqAdapter та GeminiAdapter реалізовані та протестовані
 - [x] Fallback chain: Groq → Gemini → Ollama (якщо доступний)
 - [x] Token budget guard обов'язковий
 - [x] API ключі тільки з env vars (НІКОЛИ не хардкодити)
-- [ ] OllamaAdapter (optional, нижчий пріоритет)
+- [x] OllamaAdapter (optional, нижчий пріоритет)
 
 ---
 
@@ -1084,19 +1084,19 @@ def select_voice(lang: str, gender: str = "male") -> str:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-096 | 🔲 | Додати `edge-tts` до pyproject.toml | `pyproject.toml` | S | T-001 | — |
-| T-097 | 🔲 | Визначити `TTSAdapter` ABC у base.py | `modules/adapters/base.py` | S | T-006 | — |
-| T-098 | 🔲 | Створити `EdgeTTSAdapter` клас | `modules/adapters/tts_edge.py` | M | T-097 | — |
-| T-099 | 🔲 | Реалізувати `async synthesize(text, voice, output_path)` → Path | `modules/adapters/tts_edge.py` | L | T-098 | — |
-| T-100 | 🔲 | Реалізувати `select_voice(lang, gender)` → str (hash map) | `modules/adapters/tts_edge.py` | S | T-098 | — |
-| T-101 | 🔲 | Реалізувати text chunking для довгих скриптів (>5000 символів) | `modules/adapters/tts_edge.py` | M | T-099 | — |
-| T-102 | 🔲 | Реалізувати конкатенацію audio chunks → один .mp3 | `modules/adapters/tts_edge.py` | M | T-101 | — |
-| T-103 | 🔲 | Зберігати вихідний файл у `YTAIMBOT_DATA_DIR/audio/` | `modules/adapters/tts_edge.py` | S | T-099 | — |
-| T-104 | 🔲 | Написати тести (mock edge_tts.Communicate) | `tests/test_tts_edge.py` | M | T-098 | — |
-| T-105 | 🔲 | Тест: synthesize() повертає валідний шлях до .mp3 | `tests/test_tts_edge.py` | S | T-104 | — |
-| T-106 | 🔲 | Тест: select_voice("uk", "male") → "uk-UA-OstapNeural" | `tests/test_tts_edge.py` | S | T-104 | — |
-| T-107 | 🔲 | Тест: текст > 5000 символів розбивається на chunks | `tests/test_tts_edge.py` | M | T-104 | — |
-| T-108 | 🔲 | Тест: невідома мова → fallback до en-US | `tests/test_tts_edge.py` | S | T-104 | — |
+| T-096 | ✅ | Додати `edge-tts` до pyproject.toml | `pyproject.toml` | S | T-001 | 2026-03-22 |
+| T-097 | ✅ | Визначити `TTSAdapter` ABC у base.py | `modules/adapters/base.py` | S | T-006 | 2026-03-22 |
+| T-098 | ✅ | Створити `EdgeTTSAdapter` клас | `modules/adapters/tts/edge_tts.py` | M | T-097 | 2026-03-22 |
+| T-099 | ✅ | Реалізувати `async synthesize(text, voice, output_path)` → Path | `modules/adapters/tts/edge_tts.py` | L | T-098 | 2026-03-22 |
+| T-100 | ✅ | Реалізувати `select_voice(lang, gender)` → str (hash map) | `modules/adapters/tts/edge_tts.py` | S | T-098 | 2026-03-22 |
+| T-101 | ✅ | Реалізувати text chunking для довгих скриптів (>5000 символів) | `modules/adapters/tts/edge_tts.py` | M | T-099 | 2026-03-22 |
+| T-102 | ✅ | Реалізувати конкатенацію audio chunks → один .mp3 | `modules/adapters/tts/edge_tts.py` | M | T-101 | 2026-03-22 |
+| T-103 | ✅ | Зберігати вихідний файл у `YTAIMBOT_DATA_DIR/audio/` | `modules/adapters/tts/edge_tts.py` | S | T-099 | 2026-03-22 |
+| T-104 | ✅ | Написати тести (mock edge_tts.Communicate) | `tests/test_edge_tts_adapter.py` | M | T-098 | 2026-03-22 |
+| T-105 | ✅ | Тест: synthesize() повертає валідний шлях до .mp3 | `tests/test_edge_tts_adapter.py` | S | T-104 | 2026-03-22 |
+| T-106 | ✅ | Тест: select_voice("uk", "male") → "uk-UA-OstapNeural" | `tests/test_edge_tts_adapter.py` | S | T-104 | 2026-03-22 |
+| T-107 | ✅ | Тест: текст > 5000 символів розбивається на chunks | `tests/test_edge_tts_adapter.py` | M | T-104 | 2026-03-22 |
+| T-108 | ✅ | Тест: невідома мова → fallback до en-US | `tests/test_edge_tts_adapter.py` | S | T-104 | 2026-03-22 |
 
 ---
 
@@ -1146,14 +1146,14 @@ FreeTierTTSChain.speak(text, output_path) → Path:
 | T-117 | ✅ | Тест: перший сервіс падає → fallback до другого | `tests/unit/test_free_tier_stack.py` | M | T-115 | 2026-W5 |
 | T-118 | ✅ | Тест: всі сервіси падають → RuntimeError | `tests/unit/test_free_tier_stack.py` | M | T-115 | 2026-W5 |
 | T-119 | ✅ | Тест: quota exhausted → сервіс пропускається | `tests/unit/test_free_tier_stack.py` | M | T-115 | 2026-W5 |
-| T-120 | 🔲 | Інтегрувати `FreeTierTTSChain` у Pipeline Stage 8 | `modules/orchestrator.py` | M | T-112,T-153 | — |
+| T-120 | ✅ | Інтегрувати `FreeTierTTSChain` у Pipeline Stage 8 | `modules/orchestrator.py` | M | T-112,T-153 | 2026-03-22 |
 
 **Acceptance для EPIC 2.3:**
 - [x] ElevenLabs → Gemini TTS → TTSMaker → edge-tts ланцюжок реалізовано
 - [x] ServiceQuotaTracker управляє квотами (data/quota.db)
 - [x] edge-tts ЗАВЖДИ в кінці (∞ fallback, ніколи не падає)
 - [x] Кожен адаптер реалізує `TTSAdapter` ABC
-- [ ] Pipeline Stage 8 використовує `FreeTierTTSChain`
+- [x] Pipeline Stage 8 використовує `FreeTierTTSChain`
 
 ---
 
@@ -1183,21 +1183,21 @@ ScriptGenerator.generate(plan: ContentPlan, seed: int) -> Script:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-121 | 🔲 | Створити `Script` dataclass у schemas.py | `src/ytaimbot_ml/schemas.py` | S | T-002 | — |
-| T-122 | 🔲 | Створити `ScriptSection` dataclass (hook/intro/body/cta) | `src/ytaimbot_ml/schemas.py` | S | T-121 | — |
-| T-123 | 🔲 | Створити `src/ytaimbot_ml/content/` пакет | `src/ytaimbot_ml/content/__init__.py` | S | T-003 | — |
-| T-124 | 🔲 | Реалізувати `ScriptGenerator` клас | `src/ytaimbot_ml/content/generator.py` | L | T-082, T-123 | — |
-| T-125 | 🔲 | Реалізувати `generate(plan, rng)` → Script | `src/ytaimbot_ml/content/generator.py` | XL | T-124 | — |
-| T-126 | 🔲 | Реалізувати `_build_hook_prompt(plan)` → str | `src/ytaimbot_ml/content/generator.py` | M | T-124 | — |
-| T-127 | 🔲 | Реалізувати `_build_body_prompt(plan, section_idx)` → str | `src/ytaimbot_ml/content/generator.py` | M | T-124 | — |
-| T-128 | 🔲 | Реалізувати `_build_cta_prompt(plan)` → str | `src/ytaimbot_ml/content/generator.py` | S | T-124 | — |
-| T-129 | 🔲 | Реалізувати `_validate_script(script)` → bool (≥500 слів) | `src/ytaimbot_ml/content/generator.py` | M | T-124 | — |
-| T-130 | 🔲 | Реалізувати `_inject_keywords(text, keywords)` → str | `src/ytaimbot_ml/content/generator.py` | M | T-124 | — |
-| T-131 | 🔲 | Написати тести для ScriptGenerator (mock LLMAdapter) | `tests/test_script_generator.py` | M | T-124 | — |
-| T-132 | 🔲 | Тест: generate() повертає Script з ≥500 слів | `tests/test_script_generator.py` | M | T-131 | — |
-| T-133 | 🔲 | Тест: всі keywords присутні у скрипті | `tests/test_script_generator.py` | M | T-131 | — |
-| T-134 | 🔲 | Тест: детермінізм — однаковий seed → однаковий результат | `tests/test_script_generator.py` | M | T-131 | — |
-| T-135 | 🔲 | Тест: структура Script має hook/intro/body/cta секції | `tests/test_script_generator.py` | S | T-131 | — |
+| T-121 | ✅ | Створити `Script` dataclass у schemas.py | `src/ytaimbot_ml/schemas.py` | S | T-002 | 2026-03-22 |
+| T-122 | ✅ | Створити `ScriptSection` dataclass (hook/intro/body/cta) | `src/ytaimbot_ml/schemas.py` | S | T-121 | 2026-03-22 |
+| T-123 | ✅ | Створити `src/ytaimbot_ml/content/` пакет | `src/ytaimbot_ml/content/__init__.py` | S | T-003 | 2026-03-22 |
+| T-124 | ✅ | Реалізувати `ScriptGenerator` клас | `src/ytaimbot_ml/content/script_generator.py` | L | T-082, T-123 | 2026-03-22 |
+| T-125 | ✅ | Реалізувати `generate(plan, rng)` → Script | `src/ytaimbot_ml/content/script_generator.py` | XL | T-124 | 2026-03-22 |
+| T-126 | ✅ | Реалізувати `_build_hook_prompt(plan)` → str | `src/ytaimbot_ml/content/script_generator.py` | M | T-124 | 2026-03-22 |
+| T-127 | ✅ | Реалізувати `_build_body_prompt(plan, section_idx)` → str | `src/ytaimbot_ml/content/script_generator.py" | M | T-124 | 2026-03-22 |
+| T-128 | ✅ | Реалізувати `_build_cta_prompt(plan)` → str | `src/ytaimbot_ml/content/script_generator.py` | S | T-124 | 2026-03-22 |
+| T-129 | ✅ | Реалізувати `_validate_script(script)` → bool (≥500 слів) | `src/ytaimbot_ml/content/script_generator.py` | M | T-124 | 2026-03-22 |
+| T-130 | ✅ | Реалізувати `_inject_keywords(text, keywords)` → str | `src/ytaimbot_ml/content/script_generator.py` | M | T-124 | 2026-03-22 |
+| T-131 | ✅ | Написати тести для ScriptGenerator (mock LLMAdapter) | `tests/unit/test_script_generator.py` | M | T-124 | 2026-03-22 |
+| T-132 | ✅ | Тест: generate() повертає Script з ≥500 слів | `tests/unit/test_script_generator.py` | M | T-131 | 2026-03-22 |
+| T-133 | ✅ | Тест: всі keywords присутні у скрипті | `tests/unit/test_script_generator.py` | M | T-131 | 2026-03-22 |
+| T-134 | ✅ | Тест: детермінізм — однаковий seed → однаковий результат | `tests/unit/test_script_generator.py` | M | T-131 | 2026-03-22 |
+| T-135 | ✅ | Тест: структура Script має hook/intro/body/cta секції | `tests/unit/test_script_generator.py` | S | T-131 | 2026-03-22 |
 
 ---
 
@@ -1227,21 +1227,21 @@ select_template(plan: ContentPlan, templates: list[Template]) -> Template:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-136 | 🔲 | Створити `templates/` директорію | `src/ytaimbot_ml/content/templates/` | S | T-123 | — |
-| T-137 | 🔲 | Створити шаблон `tutorial.md` (how-to контент) | `src/ytaimbot_ml/content/templates/tutorial.md` | M | T-136 | — |
-| T-138 | 🔲 | Створити шаблон `explainer.md` (пояснювальний контент) | `src/ytaimbot_ml/content/templates/explainer.md` | M | T-136 | — |
-| T-139 | 🔲 | Створити шаблон `shorts.md` (Shorts ≤60с) | `src/ytaimbot_ml/content/templates/shorts.md` | M | T-136 | — |
-| T-140 | 🔲 | Створити шаблон `review.md` (огляди продуктів) | `src/ytaimbot_ml/content/templates/review.md` | M | T-136 | — |
-| T-141 | 🔲 | Створити шаблон `listicle.md` (топ-N формат) | `src/ytaimbot_ml/content/templates/listicle.md` | M | T-136 | — |
-| T-142 | 🔲 | Реалізувати `TemplateEngine` клас | `src/ytaimbot_ml/content/template_engine.py` | M | T-123 | — |
-| T-143 | 🔲 | Реалізувати `load_templates()` → dict[str, Template] (з кешем) | `src/ytaimbot_ml/content/template_engine.py` | M | T-142 | — |
-| T-144 | 🔲 | Реалізувати `select_template(plan)` → Template (cosine sim) | `src/ytaimbot_ml/content/template_engine.py` | L | T-142 | — |
-| T-145 | 🔲 | Реалізувати `render(template, variables)` → str | `src/ytaimbot_ml/content/template_engine.py` | M | T-142 | — |
-| T-146 | 🔲 | Написати тести для TemplateEngine | `tests/test_template_engine.py` | M | T-142 | — |
-| T-147 | 🔲 | Тест: select_template повертає найбільш релевантний шаблон | `tests/test_template_engine.py` | M | T-146 | — |
-| T-148 | 🔲 | Тест: render() замінює всі {placeholder} | `tests/test_template_engine.py` | S | T-146 | — |
-| T-149 | 🔲 | Тест: load_templates() кешує — повторний виклик не читає диск | `tests/test_template_engine.py` | M | T-146 | — |
-| T-150 | 🔲 | Тест: невідомий шаблон → fallback до `explainer.md` | `tests/test_template_engine.py` | S | T-146 | — |
+| T-136 | ✅ | Створити `templates/` директорію | `src/ytaimbot_ml/content/templates/` | S | T-123 | 2026-03-22 |
+| T-137 | ✅ | Створити шаблон `tutorial.md` (how-to контент) | `src/ytaimbot_ml/content/templates/tutorial.md` | M | T-136 | 2026-03-22 |
+| T-138 | ✅ | Створити шаблон `explainer.md` (пояснювальний контент) | `src/ytaimbot_ml/content/templates/explainer.md` | M | T-136 | 2026-03-22 |
+| T-139 | ✅ | Створити шаблон `shorts.md` (Shorts ≤60с) | `src/ytaimbot_ml/content/templates/shorts.md` | M | T-136 | 2026-03-22 |
+| T-140 | ✅ | Створити шаблон `review.md` (огляди продуктів) | `src/ytaimbot_ml/content/templates/review.md` | M | T-136 | 2026-03-22 |
+| T-141 | ✅ | Створити шаблон `listicle.md` (топ-N формат) | `src/ytaimbot_ml/content/templates/listicle.md` | M | T-136 | 2026-03-22 |
+| T-142 | ✅ | Реалізувати `TemplateEngine` клас | `src/ytaimbot_ml/content/template_engine.py` | M | T-123 | 2026-03-22 |
+| T-143 | ✅ | Реалізувати `load_templates()` → dict[str, Template] (з кешем) | `src/ytaimbot_ml/content/template_engine.py` | M | T-142 | 2026-03-22 |
+| T-144 | ✅ | Реалізувати `select_template(plan)` → Template (cosine sim) | `src/ytaimbot_ml/content/template_engine.py` | L | T-142 | 2026-03-22 |
+| T-145 | ✅ | Реалізувати `render(template, variables)` → str | `src/ytaimbot_ml/content/template_engine.py` | M | T-142 | 2026-03-22 |
+| T-146 | ✅ | Написати тести для TemplateEngine | `tests/unit/test_template_engine.py` | M | T-142 | 2026-03-22 |
+| T-147 | ✅ | Тест: select_template повертає найбільш релевантний шаблон | `tests/unit/test_template_engine.py` | M | T-146 | 2026-03-22 |
+| T-148 | ✅ | Тест: render() замінює всі {placeholder} | `tests/unit/test_template_engine.py` | S | T-146 | 2026-03-22 |
+| T-149 | ✅ | Тест: load_templates() кешує — повторний виклик не читає диск | `tests/unit/test_template_engine.py` | M | T-146 | 2026-03-22 |
+| T-150 | ✅ | Тест: невідомий шаблон → fallback до `explainer.md` | `tests/unit/test_template_engine.py` | S | T-146 | 2026-03-22 |
 
 ---
 
@@ -1320,21 +1320,21 @@ VideoDAG:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-161 | 🔲 | Додати `moviepy` до pyproject.toml | `pyproject.toml` | S | T-001 | — |
-| T-162 | 🔲 | Визначити `VideoAssembler` ABC у base.py | `modules/adapters/base.py` | S | T-006 | — |
-| T-163 | 🔲 | Створити `modules/video/` пакет | `modules/video/__init__.py` | S | T-008 | — |
-| T-164 | 🔲 | Реалізувати `MoviePyAssembler` клас | `modules/video/assembler.py` | L | T-162, T-163 | — |
-| T-165 | 🔲 | Реалізувати `assemble(audio_path, images, srt_path)` → Path | `modules/video/assembler.py` | XL | T-164 | — |
-| T-166 | 🔲 | Реалізувати конфігурацію: resolution (1080p), fps (30), codec (h264) | `modules/video/assembler.py` | M | T-164 | — |
-| T-167 | 🔲 | Реалізувати subtitle overlay (TextClip поверх відео) | `modules/video/assembler.py` | L | T-165 | — |
-| T-168 | 🔲 | Реалізувати batch frame processing (уникати OOM на 4GB RAM) | `modules/video/assembler.py` | L | T-165 | — |
-| T-169 | 🔲 | Зберігати вихідний файл у `YTAIMBOT_DATA_DIR/videos/` | `modules/video/assembler.py` | S | T-165 | — |
-| T-170 | 🔲 | Додати FFmpeg до Dockerfile (apt-get install ffmpeg) | `Dockerfile` | S | T-014 | — |
-| T-171 | 🔲 | Написати тести (mock MoviePy, не генерувати реальне відео) | `tests/test_video_assembler.py` | M | T-164 | — |
-| T-172 | 🔲 | Тест: assemble() повертає валідний шлях до .mp4 | `tests/test_video_assembler.py` | S | T-171 | — |
-| T-173 | 🔲 | Тест: вихідний файл у правильній директорії | `tests/test_video_assembler.py` | S | T-171 | — |
-| T-174 | 🔲 | Тест: без subtitle файлу → відео без субтитрів (не crash) | `tests/test_video_assembler.py` | M | T-171 | — |
-| T-175 | 🔲 | Тест: конфігурація resolution/fps читається з env vars | `tests/test_video_assembler.py` | S | T-171 | — |
+| T-161 | ✅ | Додати `moviepy` до pyproject.toml | `pyproject.toml` | S | T-001 | 2026-03-22 |
+| T-162 | ✅ | Визначити `VideoAssembler` ABC у base.py | `modules/adapters/base.py` | S | T-006 | 2026-03-22 |
+| T-163 | ✅ | Створити `modules/video/` пакет | `modules/video/__init__.py` | S | T-008 | 2026-03-22 |
+| T-164 | ✅ | Реалізувати `MoviePyAssembler` клас | `modules/video/assembler.py` | L | T-162, T-163 | 2026-03-22 |
+| T-165 | ✅ | Реалізувати `assemble(audio_path, images, srt_path)` → Path | `modules/video/assembler.py` | XL | T-164 | 2026-03-22 |
+| T-166 | ✅ | Реалізувати конфігурацію: resolution (1080p), fps (30), codec (h264) | `modules/video/assembler.py` | M | T-164 | 2026-03-22 |
+| T-167 | ✅ | Реалізувати subtitle overlay (TextClip поверх відео) | `modules/video/assembler.py` | L | T-165 | 2026-03-22 |
+| T-168 | ✅ | Реалізувати batch frame processing (уникати OOM на 4GB RAM) | `modules/video/assembler.py` | L | T-165 | 2026-03-22 |
+| T-169 | ✅ | Зберігати вихідний файл у `YTAIMBOT_DATA_DIR/videos/` | `modules/video/assembler.py` | S | T-165 | 2026-03-22 |
+| T-170 | ✅ | Додати FFmpeg до Dockerfile (apt-get install ffmpeg) | `Dockerfile` | S | T-014 | 2026-03-22 |
+| T-171 | ✅ | Написати тести (mock MoviePy, не генерувати реальне відео) | `tests/test_video_assembler.py` | M | T-164 | 2026-03-22 |
+| T-172 | ✅ | Тест: assemble() повертає валідний шлях до .mp4 | `tests/test_video_assembler.py` | S | T-171 | 2026-03-22 |
+| T-173 | ✅ | Тест: вихідний файл у правильній директорії | `tests/test_video_assembler.py` | S | T-171 | 2026-03-22 |
+| T-174 | ✅ | Тест: без subtitle файлу → відео без субтитрів (не crash) | `tests/test_video_assembler.py` | M | T-171 | 2026-03-22 |
+| T-175 | ✅ | Тест: конфігурація resolution/fps читається з env vars | `tests/test_video_assembler.py` | S | T-171 | 2026-03-22 |
 
 **Acceptance для EPIC 3.1:**
 - [ ] Реалізує `VideoAssembler` ABC
@@ -1368,17 +1368,17 @@ ThumbnailGenerator.generate(title, color_scheme) → Image:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-176 | 🔲 | Додати `Pillow` до pyproject.toml | `pyproject.toml` | S | T-001 | — |
-| T-177 | 🔲 | Реалізувати `ThumbnailGenerator` клас | `modules/video/thumbnail.py` | M | T-163 | — |
-| T-178 | 🔲 | Реалізувати `generate(title, subtitle, color_scheme)` → Path | `modules/video/thumbnail.py` | L | T-177 | — |
-| T-179 | 🔲 | Реалізувати Layer Stack rendering (background → gradient → text) | `modules/video/thumbnail.py` | L | T-178 | — |
-| T-180 | 🔲 | Реалізувати `ColorScheme` dataclass (≥5 схем: dark/light/vibrant/pro/minimal) | `modules/video/thumbnail.py` | M | T-177 | — |
-| T-181 | 🔲 | Реалізувати auto font sizing (заголовок займає 60-80% ширини) | `modules/video/thumbnail.py` | M | T-178 | — |
-| T-182 | 🔲 | Реалізувати збереження як JPEG (якість 95, ≤2MB) | `modules/video/thumbnail.py` | S | T-178 | — |
-| T-183 | 🔲 | Написати тести для ThumbnailGenerator | `tests/test_thumbnail.py` | M | T-177 | — |
-| T-184 | 🔲 | Тест: вихід — 1280×720 пікселів | `tests/test_thumbnail.py` | S | T-183 | — |
-| T-185 | 🔲 | Тест: розмір файлу ≤ 2MB | `tests/test_thumbnail.py` | S | T-183 | — |
-| T-186 | 🔲 | Тест: title присутній у зображенні (OCR-free перевірка через mock) | `tests/test_thumbnail.py` | S | T-183 | — |
+| T-176 | ✅ | Додати `Pillow` до pyproject.toml | `pyproject.toml` | S | T-001 | 2026-03-22 |
+| T-177 | ✅ | Реалізувати `ThumbnailGenerator` клас | `modules/video/thumbnail.py` | M | T-163 | 2026-03-22 |
+| T-178 | ✅ | Реалізувати `generate(title, subtitle, color_scheme)` → Path | `modules/video/thumbnail.py` | L | T-177 | 2026-03-22 |
+| T-179 | ✅ | Реалізувати Layer Stack rendering (background → gradient → text) | `modules/video/thumbnail.py` | L | T-178 | 2026-03-22 |
+| T-180 | ✅ | Реалізувати `ColorScheme` dataclass (≥5 схем: dark/light/vibrant/pro/minimal) | `modules/video/thumbnail.py` | M | T-177 | 2026-03-22 |
+| T-181 | ✅ | Реалізувати auto font sizing (заголовок займає 60-80% ширини) | `modules/video/thumbnail.py` | M | T-178 | 2026-03-22 |
+| T-182 | ✅ | Реалізувати збереження як JPEG (якість 95, ≤2MB) | `modules/video/thumbnail.py` | S | T-178 | 2026-03-22 |
+| T-183 | ✅ | Написати тести для ThumbnailGenerator | `tests/test_thumbnail.py` | M | T-177 | 2026-03-22 |
+| T-184 | ✅ | Тест: вихід — 1280×720 пікселів | `tests/test_thumbnail.py` | S | T-183 | 2026-03-22 |
+| T-185 | ✅ | Тест: розмір файлу ≤ 2MB | `tests/test_thumbnail.py` | S | T-183 | 2026-03-22 |
+| T-186 | ✅ | Тест: title присутній у зображенні (OCR-free перевірка через mock) | `tests/test_thumbnail.py` | S | T-183 | 2026-03-22 |
 | T-187 | 🔲 | Тест: всі 5 ColorScheme генерують без помилок | `tests/test_thumbnail.py` | M | T-183 | — |
 
 ---
@@ -1415,17 +1415,17 @@ generate_srt(script: str, audio_duration: float) -> str:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-188 | 🔲 | Реалізувати `SubtitleGenerator` клас | `modules/video/subtitles.py` | M | T-163 | — |
-| T-189 | 🔲 | Реалізувати `SRTBlock` dataclass | `modules/video/subtitles.py` | S | T-188 | — |
-| T-190 | 🔲 | Реалізувати `generate_srt(script, audio_duration)` → str | `modules/video/subtitles.py` | L | T-188 | — |
-| T-191 | 🔲 | Реалізувати `save_srt(content, output_path)` → Path | `modules/video/subtitles.py` | S | T-188 | — |
-| T-192 | 🔲 | Реалізувати `format_timecode(seconds)` → "HH:MM:SS,mmm" | `modules/video/subtitles.py` | M | T-188 | — |
-| T-193 | 🔲 | Реалізувати sliding window розмір через env var `SUBTITLE_WORDS_PER_BLOCK` | `modules/video/subtitles.py` | S | T-190 | — |
-| T-194 | 🔲 | Написати тести для SubtitleGenerator | `tests/test_subtitles.py` | M | T-188 | — |
-| T-195 | 🔲 | Тест: SRT формат валідний (sequence, timecode, text) | `tests/test_subtitles.py` | M | T-194 | — |
-| T-196 | 🔲 | Тест: timecode не перевищує audio_duration | `tests/test_subtitles.py` | S | T-194 | — |
-| T-197 | 🔲 | Тест: всі слова скрипту присутні у SRT | `tests/test_subtitles.py` | M | T-194 | — |
-| T-198 | 🔲 | Тест: порожній скрипт → порожній SRT (не crash) | `tests/test_subtitles.py` | S | T-194 | — |
+| T-188 | ✅ | Реалізувати `SubtitleGenerator` клас | `modules/video/subtitles.py` | M | T-163 | 2026-03-22 |
+| T-189 | ✅ | Реалізувати `SRTBlock` dataclass | `modules/video/subtitles.py` | S | T-188 | 2026-03-22 |
+| T-190 | ✅ | Реалізувати `generate_srt(script, audio_duration)` → str | `modules/video/subtitles.py` | L | T-188 | 2026-03-22 |
+| T-191 | ✅ | Реалізувати `save_srt(content, output_path)` → Path | `modules/video/subtitles.py` | S | T-188 | 2026-03-22 |
+| T-192 | ✅ | Реалізувати `format_timecode(seconds)` → "HH:MM:SS,mmm" | `modules/video/subtitles.py` | M | T-188 | 2026-03-22 |
+| T-193 | ✅ | Реалізувати sliding window розмір через env var `SUBTITLE_WORDS_PER_BLOCK` | `modules/video/subtitles.py` | S | T-190 | 2026-03-22 |
+| T-194 | ✅ | Написати тести для SubtitleGenerator | `tests/test_subtitles.py` | M | T-188 | 2026-03-22 |
+| T-195 | ✅ | Тест: SRT формат валідний (sequence, timecode, text) | `tests/test_subtitles.py` | M | T-194 | 2026-03-22 |
+| T-196 | ✅ | Тест: timecode не перевищує audio_duration | `tests/test_subtitles.py` | S | T-194 | 2026-03-22 |
+| T-197 | ✅ | Тест: всі слова скрипту присутні у SRT | `tests/test_subtitles.py` | M | T-194 | 2026-03-22 |
+| T-198 | ✅ | Тест: порожній скрипт → порожній SRT (не crash) | `tests/test_subtitles.py` | S | T-194 | 2026-03-22 |
 
 ---
 
@@ -1464,20 +1464,20 @@ expand_keywords(seed_keywords: list[str], depth=2) -> list[str]:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-199 | 🔲 | Створити `src/ytaimbot_ml/seo/` пакет | `src/ytaimbot_ml/seo/__init__.py` | S | T-003 | — |
-| T-200 | 🔲 | Реалізувати `SEOOptimizer` клас | `src/ytaimbot_ml/seo/optimizer.py` | M | T-199 | — |
-| T-201 | 🔲 | Реалізувати `expand_keywords(seeds, depth=2)` → list[str] (BFS) | `src/ytaimbot_ml/seo/optimizer.py` | L | T-200 | — |
-| T-202 | 🔲 | Реалізувати `_autocomplete(keyword)` → list[str] (Google Suggest) | `src/ytaimbot_ml/seo/optimizer.py` | M | T-200 | — |
-| T-203 | 🔲 | Реалізувати `relevance_score(keyword, seed)` → float | `src/ytaimbot_ml/seo/optimizer.py` | M | T-200 | — |
-| T-204 | 🔲 | Реалізувати `deduplicate(keywords)` → list[str] (set + order) | `src/ytaimbot_ml/seo/optimizer.py` | S | T-200 | — |
-| T-205 | 🔲 | Додати `@retry` до autocomplete HTTP запитів | `src/ytaimbot_ml/seo/optimizer.py` | S | T-017, T-202 | — |
-| T-206 | 🔲 | Реалізувати результат ≥ 10 keywords (або raise якщо неможливо) | `src/ytaimbot_ml/seo/optimizer.py` | S | T-201 | — |
-| T-207 | 🔲 | Написати тести для SEOOptimizer (mock HTTP) | `tests/test_seo_optimizer.py` | M | T-200 | — |
-| T-208 | 🔲 | Тест: expand_keywords повертає ≥ 10 keywords | `tests/test_seo_optimizer.py` | S | T-207 | — |
-| T-209 | 🔲 | Тест: дублікати видаляються | `tests/test_seo_optimizer.py` | S | T-207 | — |
-| T-210 | 🔲 | Тест: BFS depth=2 → не більше 2 рівнів розширення | `tests/test_seo_optimizer.py` | M | T-207 | — |
-| T-211 | 🔲 | Тест: HTTP помилка → порожній список (не crash) | `tests/test_seo_optimizer.py` | M | T-207 | — |
-| T-212 | 🔲 | Тест: жодних реальних HTTP запитів у тестах | `tests/test_seo_optimizer.py` | S | T-207 | — |
+| T-199 | ✅ | Створити `src/ytaimbot_ml/seo/` пакет | `src/ytaimbot_ml/seo/__init__.py` | S | T-003 | 2026-03-22 |
+| T-200 | ✅ | Реалізувати `SEOOptimizer` клас | `src/ytaimbot_ml/seo/keyword_expander.py` | M | T-199 | 2026-03-22 |
+| T-201 | ✅ | Реалізувати `expand_keywords(seeds, depth=2)` → list[str] (BFS) | `src/ytaimbot_ml/seo/keyword_expander.py` | L | T-200 | 2026-03-22 |
+| T-202 | ✅ | Реалізувати `_autocomplete(keyword)` → list[str] (Google Suggest) | `src/ytaimbot_ml/seo/keyword_expander.py` | M | T-200 | 2026-03-22 |
+| T-203 | ✅ | Реалізувати `relevance_score(keyword, seed)` → float | `src/ytaimbot_ml/seo/keyword_expander.py` | M | T-200 | 2026-03-22 |
+| T-204 | ✅ | Реалізувати `deduplicate(keywords)` → list[str] (set + order) | `src/ytaimbot_ml/seo/keyword_expander.py` | S | T-200 | 2026-03-22 |
+| T-205 | ✅ | Додати `@retry` до autocomplete HTTP запитів | `src/ytaimbot_ml/seo/keyword_expander.py` | S | T-017, T-202 | 2026-03-22 |
+| T-206 | ✅ | Реалізувати результат ≥ 10 keywords (або raise якщо неможливо) | `src/ytaimbot_ml/seo/keyword_expander.py` | S | T-201 | 2026-03-22 |
+| T-207 | ✅ | Написати тести для SEOOptimizer (mock HTTP) | `tests/unit/test_seo_optimizer.py` | M | T-200 | 2026-03-22 |
+| T-208 | ✅ | Тест: expand_keywords повертає ≥ 10 keywords | `tests/unit/test_seo_optimizer.py` | S | T-207 | 2026-03-22 |
+| T-209 | ✅ | Тест: дублікати видаляються | `tests/unit/test_seo_optimizer.py` | S | T-207 | 2026-03-22 |
+| T-210 | ✅ | Тест: BFS depth=2 → не більше 2 рівнів розширення | `tests/unit/test_seo_optimizer.py` | M | T-207 | 2026-03-22 |
+| T-211 | ✅ | Тест: HTTP помилка → порожній список (не crash) | `tests/unit/test_seo_optimizer.py` | M | T-207 | 2026-03-22 |
+| T-212 | ✅ | Тест: жодних реальних HTTP запитів у тестах | `tests/unit/test_seo_optimizer.py` | S | T-207 | 2026-03-22 |
 
 ---
 
@@ -1512,19 +1512,19 @@ ctr_score(title: str) -> float:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-213 | 🔲 | Реалізувати `TitleGenerator` клас | `src/ytaimbot_ml/seo/title_generator.py` | M | T-199 | — |
-| T-214 | 🔲 | Реалізувати `POWER_WORDS` константу (≥50 слів для UK/EN/RU) | `src/ytaimbot_ml/seo/title_generator.py` | M | T-213 | — |
-| T-215 | 🔲 | Реалізувати `generate_variants(plan, n=3)` → list[str] | `src/ytaimbot_ml/seo/title_generator.py` | L | T-213 | — |
-| T-216 | 🔲 | Реалізувати `ctr_score(title)` → float [0.0, 1.0] | `src/ytaimbot_ml/seo/title_generator.py` | M | T-213 | — |
-| T-217 | 🔲 | Реалізувати `select_best(variants)` → str (max ctr_score) | `src/ytaimbot_ml/seo/title_generator.py` | S | T-216 | — |
-| T-218 | 🔲 | Реалізувати валідацію: довжина 40–60 символів (trim якщо довше) | `src/ytaimbot_ml/seo/title_generator.py` | S | T-213 | — |
-| T-219 | 🔲 | Реалізувати зберігання всіх variants у PipelineResult (для A/B) | `src/ytaimbot_ml/seo/title_generator.py` | M | T-213 | — |
-| T-220 | 🔲 | Написати тести для TitleGenerator | `tests/test_title_generator.py` | M | T-213 | — |
-| T-221 | 🔲 | Тест: generate_variants() повертає 3 унікальних варіанти | `tests/test_title_generator.py` | S | T-220 | — |
-| T-222 | 🔲 | Тест: кожен title 40–60 символів | `tests/test_title_generator.py` | S | T-220 | — |
-| T-223 | 🔲 | Тест: ctr_score(title з числом + power word) > 0.6 | `tests/test_title_generator.py` | M | T-220 | — |
-| T-224 | 🔲 | Тест: детермінізм — seed → однакові variants | `tests/test_title_generator.py` | M | T-220 | — |
-| T-225 | 🔲 | Тест: seed keyword присутній хоча б у 2 з 3 варіантів | `tests/test_title_generator.py` | M | T-220 | — |
+| T-213 | ✅ | Реалізувати `TitleGenerator` клас | `src/ytaimbot_ml/seo/title_generator.py` | M | T-199 | 2026-03-22 |
+| T-214 | ✅ | Реалізувати `POWER_WORDS` константу (≥50 слів для UK/EN/RU) | `src/ytaimbot_ml/seo/title_generator.py` | M | T-213 | 2026-03-22 |
+| T-215 | ✅ | Реалізувати `generate_variants(plan, n=3)` → list[str] | `src/ytaimbot_ml/seo/title_generator.py` | L | T-213 | 2026-03-22 |
+| T-216 | ✅ | Реалізувати `ctr_score(title)` → float [0.0, 1.0] | `src/ytaimbot_ml/seo/title_generator.py` | M | T-213 | 2026-03-22 |
+| T-217 | ✅ | Реалізувати `select_best(variants)` → str (max ctr_score) | `src/ytaimbot_ml/seo/title_generator.py` | S | T-216 | 2026-03-22 |
+| T-218 | ✅ | Реалізувати валідацію: довжина 40–60 символів (trim якщо довше) | `src/ytaimbot_ml/seo/title_generator.py` | S | T-213 | 2026-03-22 |
+| T-219 | ✅ | Реалізувати зберігання всіх variants у PipelineResult (для A/B) | `src/ytaimbot_ml/seo/title_generator.py` | M | T-213 | 2026-03-22 |
+| T-220 | ✅ | Написати тести для TitleGenerator | `tests/unit/test_title_generator.py` | M | T-213 | 2026-03-22 |
+| T-221 | ✅ | Тест: generate_variants() повертає 3 унікальних варіанти | `tests/unit/test_title_generator.py` | S | T-220 | 2026-03-22 |
+| T-222 | ✅ | Тест: кожен title 40–60 символів | `tests/unit/test_title_generator.py` | S | T-220 | 2026-03-22 |
+| T-223 | ✅ | Тест: ctr_score(title з числом + power word) > 0.6 | `tests/unit/test_title_generator.py` | M | T-220 | 2026-03-22 |
+| T-224 | ✅ | Тест: детермінізм — seed → однакові variants | `tests/unit/test_title_generator.py` | M | T-220 | 2026-03-22 |
+| T-225 | ✅ | Тест: seed keyword присутній хоча б у 2 з 3 варіантів | `tests/unit/test_title_generator.py` | M | T-220 | 2026-03-22 |
 
 ---
 
@@ -1538,19 +1538,19 @@ ctr_score(title: str) -> float:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-226 | 🔲 | Розширити `PipelineResult` полями video_path, thumbnail_path, seo_keywords, title_variants | `src/ytaimbot_ml/schemas.py` | S | T-151 | — |
-| T-227 | 🔲 | Додати `_assemble_video()` стадію у Pipeline | `modules/orchestrator.py` | L | T-165, T-153 | — |
-| T-228 | 🔲 | Додати `_generate_thumbnail()` стадію у Pipeline | `modules/orchestrator.py` | M | T-178, T-227 | — |
-| T-229 | 🔲 | Додати `_optimize_seo()` стадію у Pipeline | `modules/orchestrator.py` | M | T-201, T-215 | — |
-| T-230 | 🔲 | Додати `_generate_subtitles()` стадію у Pipeline | `modules/orchestrator.py` | M | T-190, T-153 | — |
-| T-231 | 🔲 | Додати `VIDEO_RESOLUTION`, `VIDEO_FPS`, `VIDEO_CODEC` до .env.example | `.env.example` | S | T-166 | — |
-| T-232 | 🔲 | Додати `SUBTITLE_WORDS_PER_BLOCK` до .env.example | `.env.example` | S | T-193 | — |
-| T-233 | 🔲 | Додати `SEO_EXPANSION_DEPTH`, `SEO_MIN_KEYWORDS` до .env.example | `.env.example` | S | T-201 | — |
-| T-234 | 🔲 | Оновити docker-compose.yml з новими env vars | `docker-compose.yml` | S | T-231, T-233 | — |
-| T-235 | 🔲 | Написати інтеграційні тести Phase 3 Pipeline (всі mock) | `tests/test_orchestrator.py` | L | T-227, T-229 | — |
-| T-236 | 🔲 | Тест: Pipeline повертає PipelineResult з video_path | `tests/test_orchestrator.py` | M | T-235 | — |
-| T-237 | 🔲 | Тест: Pipeline повертає PipelineResult з thumbnail_path | `tests/test_orchestrator.py` | M | T-235 | — |
-| T-238 | 🔲 | Тест: Pipeline повертає PipelineResult з ≥10 seo_keywords | `tests/test_orchestrator.py` | M | T-235 | — |
+| T-226 | ✅ | Розширити `PipelineResult` полями video_path, thumbnail_path, seo_keywords, title_variants | `src/ytaimbot_ml/schemas.py` | S | T-151 | 2026-03-22 |
+| T-227 | ✅ | Додати `_assemble_video()` стадію у Pipeline | `modules/orchestrator.py` | L | T-165, T-153 | 2026-03-22 |
+| T-228 | ✅ | Додати `_generate_thumbnail()` стадію у Pipeline | `modules/orchestrator.py` | M | T-178, T-227 | 2026-03-22 |
+| T-229 | ✅ | Додати `_optimize_seo()` стадію у Pipeline | `modules/orchestrator.py` | M | T-201, T-215 | 2026-03-22 |
+| T-230 | ✅ | Додати `_generate_subtitles()` стадію у Pipeline | `modules/orchestrator.py` | M | T-190, T-153 | 2026-03-22 |
+| T-231 | ✅ | Додати `VIDEO_RESOLUTION`, `VIDEO_FPS`, `VIDEO_CODEC` до .env.example | `.env.example` | S | T-166 | 2026-03-22 |
+| T-232 | ✅ | Додати `SUBTITLE_WORDS_PER_BLOCK` до .env.example | `.env.example` | S | T-193 | 2026-03-22 |
+| T-233 | ✅ | Додати `SEO_EXPANSION_DEPTH`, `SEO_MIN_KEYWORDS` до .env.example | `.env.example` | S | T-201 | 2026-03-22 |
+| T-234 | ✅ | Оновити docker-compose.yml з новими env vars | `docker-compose.yml` | S | T-231, T-233 | 2026-03-22 |
+| T-235 | ✅ | Написати інтеграційні тести Phase 3 Pipeline (всі mock) | `tests/test_orchestrator.py` | L | T-227, T-229 | 2026-03-22 |
+| T-236 | ✅ | Тест: Pipeline повертає PipelineResult з video_path | `tests/test_orchestrator.py` | M | T-235 | 2026-03-22 |
+| T-237 | ✅ | Тест: Pipeline повертає PipelineResult з thumbnail_path | `tests/test_orchestrator.py` | M | T-235 | 2026-03-22 |
+| T-238 | ✅ | Тест: Pipeline повертає PipelineResult з ≥10 seo_keywords | `tests/test_orchestrator.py` | M | T-235 | 2026-03-22 |
 | T-239 | 🔲 | Запустити `pytest -q --tb=short` → всі зелені | CI | S | T-238 | — |
 | T-240 | 🔲 | Перевірити coverage ≥ 80% для нових модулів | CI | S | T-239 | — |
 
@@ -1618,22 +1618,22 @@ class TokenBucket:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-241 | 🔲 | Додати `google-auth`, `google-auth-oauthlib` до pyproject.toml | `pyproject.toml` | S | T-001 | — |
-| T-242 | 🔲 | Реалізувати `TokenBucket` клас (rate limiter) | `modules/adapters/youtube_publisher.py` | M | T-006 | — |
-| T-243 | 🔲 | Реалізувати `YouTubePublisherAdapter` клас | `modules/adapters/youtube_publisher.py` | L | T-006, T-242 | — |
-| T-244 | 🔲 | Реалізувати `publish(plan, video_path, thumbnail_path)` → str (video_id) | `modules/adapters/youtube_publisher.py` | XL | T-243 | — |
-| T-245 | 🔲 | Примусово встановити `privacyStatus="unlisted"` для перших 50 відео | `modules/adapters/youtube_publisher.py` | M | T-244 | — |
-| T-246 | 🔲 | Додати AI disclosure до metadata (`isMadeForKids=False`, опис з позначкою) | `modules/adapters/youtube_publisher.py` | M | T-244 | — |
-| T-247 | 🔲 | Реалізувати завантаження thumbnail після upload | `modules/adapters/youtube_publisher.py` | M | T-244 | — |
-| T-248 | 🔲 | Інтегрувати `TokenBucket` — блокувати якщо rate limit досягнуто | `modules/adapters/youtube_publisher.py` | M | T-242, T-244 | — |
-| T-249 | 🔲 | Реалізувати `upload_count` лічильник (persist у storage) | `modules/adapters/youtube_publisher.py` | M | T-244 | — |
-| T-250 | 🔲 | Логувати кожен upload: video_id, title, privacy, timestamp (INFO) | `modules/adapters/youtube_publisher.py` | S | T-244 | — |
-| T-251 | 🔲 | Написати тести (mock googleapiclient.discovery.build) | `tests/test_publisher.py` | M | T-243 | — |
-| T-252 | 🔲 | Тест: publish() повертає непорожній video_id string | `tests/test_publisher.py` | S | T-251 | — |
-| T-253 | 🔲 | Тест: перші 50 відео → завжди privacyStatus="unlisted" | `tests/test_publisher.py` | M | T-251 | — |
-| T-254 | 🔲 | Тест: upload_count > 50 → може бути "public" (якщо явно задано) | `tests/test_publisher.py` | M | T-251 | — |
-| T-255 | 🔲 | Тест: TokenBucket блокує при перевищенні rate limit | `tests/test_publisher.py` | M | T-251 | — |
-| T-256 | 🔲 | Тест: AI disclosure присутній у description | `tests/test_publisher.py` | S | T-251 | — |
+| T-241 | ✅ | Додати `google-auth`, `google-auth-oauthlib` до pyproject.toml | `pyproject.toml` | S | T-001 | 2026-03-22 |
+| T-242 | ✅ | Реалізувати `TokenBucket` клас (rate limiter) | `modules/adapters/publisher/quota_guard.py` | M | T-006 | 2026-03-22 |
+| T-243 | ✅ | Реалізувати `YouTubePublisherAdapter` клас | `modules/adapters/publisher/youtube_upload.py` | L | T-006, T-242 | 2026-03-22 |
+| T-244 | ✅ | Реалізувати `publish(plan, video_path, thumbnail_path)` → str (video_id) | `modules/adapters/publisher/youtube_upload.py` | XL | T-243 | 2026-03-22 |
+| T-245 | ✅ | Примусово встановити `privacyStatus="unlisted"` для перших 50 відео | `modules/adapters/publisher/youtube_upload.py` | M | T-244 | 2026-03-22 |
+| T-246 | ✅ | Додати AI disclosure до metadata (`isMadeForKids=False`, опис з позначкою) | `modules/adapters/publisher/youtube_upload.py` | M | T-244 | 2026-03-22 |
+| T-247 | ✅ | Реалізувати завантаження thumbnail після upload | `modules/adapters/publisher/youtube_upload.py` | M | T-244 | 2026-03-22 |
+| T-248 | ✅ | Інтегрувати `TokenBucket` — блокувати якщо rate limit досягнуто | `modules/adapters/publisher/youtube_upload.py` | M | T-242, T-244 | 2026-03-22 |
+| T-249 | ✅ | Реалізувати `upload_count` лічильник (persist у storage) | `modules/adapters/publisher/youtube_upload.py` | M | T-244 | 2026-03-22 |
+| T-250 | ✅ | Логувати кожен upload: video_id, title, privacy, timestamp (INFO) | `modules/adapters/publisher/youtube_upload.py` | S | T-244 | 2026-03-22 |
+| T-251 | ✅ | Написати тести (mock googleapiclient.discovery.build) | `tests/test_publisher.py` | M | T-243 | 2026-03-22 |
+| T-252 | ✅ | Тест: publish() повертає непорожній video_id string | `tests/test_publisher.py` | S | T-251 | 2026-03-22 |
+| T-253 | ✅ | Тест: перші 50 відео → завжди privacyStatus="unlisted" | `tests/test_publisher.py` | M | T-251 | 2026-03-22 |
+| T-254 | ✅ | Тест: upload_count > 50 → може бути "public" (якщо явно задано) | `tests/test_publisher.py` | M | T-251 | 2026-03-22 |
+| T-255 | ✅ | Тест: TokenBucket блокує при перевищенні rate limit | `tests/test_publisher.py` | M | T-251 | 2026-03-22 |
+| T-256 | ✅ | Тест: AI disclosure присутній у description | `tests/test_publisher.py` | S | T-251 | 2026-03-22 |
 
 **Acceptance для EPIC 4.1:**
 - [ ] Реалізує `PublisherAdapter` ABC
@@ -1673,18 +1673,18 @@ def get_valid_credentials(token_path: Path) -> Credentials:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-257 | 🔲 | Реалізувати `YouTubeAuthManager` клас | `modules/adapters/youtube_auth.py` | L | T-241 | — |
-| T-258 | 🔲 | Реалізувати `get_valid_credentials(token_path)` → Credentials | `modules/adapters/youtube_auth.py` | L | T-257 | — |
-| T-259 | 🔲 | Реалізувати auto-refresh токену (перевірка expiry) | `modules/adapters/youtube_auth.py` | M | T-258 | — |
-| T-260 | 🔲 | Реалізувати `save_credentials(creds, path)` — зашифровано | `modules/adapters/youtube_auth.py` | M | T-257 | — |
-| T-261 | 🔲 | Реалізувати `load_credentials(path)` → Credentials | None | `modules/adapters/youtube_auth.py` | M | T-257 | — |
-| T-262 | 🔲 | Реалізувати `service_account_auth(key_path)` → Credentials | `modules/adapters/youtube_auth.py` | M | T-257 | — |
-| T-263 | 🔲 | Додати `YOUTUBE_CLIENT_SECRET_PATH` до .env.example | `.env.example` | S | T-257 | — |
-| T-264 | 🔲 | Додати `youtube_token.json` та `client_secret*.json` до .gitignore | `.gitignore` | S | T-257 | — |
-| T-265 | 🔲 | Написати тести для YouTubeAuthManager (mock google.oauth2) | `tests/test_youtube_auth.py` | M | T-257 | — |
-| T-266 | 🔲 | Тест: валідний токен → повертається без refresh | `tests/test_youtube_auth.py` | S | T-265 | — |
-| T-267 | 🔲 | Тест: expired токен → auto-refresh виконується | `tests/test_youtube_auth.py` | M | T-265 | — |
-| T-268 | 🔲 | Тест: credentials НЕ логуються (перевірка caplog) | `tests/test_youtube_auth.py` | M | T-265 | — |
+| T-257 | ✅ | Реалізувати `YouTubeAuthManager` клас | `modules/adapters/publisher/youtube_upload.py` | L | T-241 | 2026-03-22 |
+| T-258 | ✅ | Реалізувати `get_valid_credentials(token_path)` → Credentials | `modules/adapters/publisher/youtube_upload.py` | L | T-257 | 2026-03-22 |
+| T-259 | ✅ | Реалізувати auto-refresh токену (перевірка expiry) | `modules/adapters/publisher/youtube_upload.py` | M | T-258 | 2026-03-22 |
+| T-260 | ✅ | Реалізувати `save_credentials(creds, path)` | `modules/adapters/publisher/youtube_upload.py` | M | T-257 | 2026-03-22 |
+| T-261 | ✅ | Реалізувати `load_credentials(path)` → Credentials | `modules/adapters/publisher/youtube_upload.py` | M | T-257 | 2026-03-22 |
+| T-262 | ✅ | Реалізувати `service_account_auth(key_path)` → Credentials | `modules/adapters/publisher/youtube_upload.py` | M | T-257 | 2026-03-22 |
+| T-263 | ✅ | Додати `YOUTUBE_CLIENT_SECRET_PATH` до .env.example | `.env.example` | S | T-257 | 2026-03-22 |
+| T-264 | ✅ | Додати `youtube_token.json` та `client_secret*.json` до .gitignore | `.gitignore` | S | T-257 | 2026-03-22 |
+| T-265 | ✅ | Написати тести для YouTubeAuthManager (mock google.oauth2) | `tests/test_youtube_auth.py` | M | T-257 | 2026-03-22 |
+| T-266 | ✅ | Тест: валідний токен → повертається без refresh | `tests/test_youtube_auth.py` | S | T-265 | 2026-03-22 |
+| T-267 | ✅ | Тест: expired токен → auto-refresh виконується | `tests/test_youtube_auth.py` | M | T-265 | 2026-03-22 |
+| T-268 | ✅ | Тест: credentials НЕ логуються (перевірка caplog) | `tests/test_youtube_auth.py` | M | T-265 | 2026-03-22 |
 
 ---
 
@@ -1723,18 +1723,18 @@ class SimilarityGate:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-269 | 🔲 | Створити `SimilarityReport` dataclass у schemas.py | `src/ytaimbot_ml/schemas.py` | S | T-002 | — |
-| T-270 | 🔲 | Реалізувати `SimilarityGate` клас | `src/ytaimbot_ml/quality/similarity_gate.py` | L | T-004, T-269 | — |
-| T-271 | 🔲 | Реалізувати `tfidf_vectorize(text)` → np.ndarray | `src/ytaimbot_ml/quality/similarity_gate.py` | M | T-270 | — |
-| T-272 | 🔲 | Реалізувати `cosine_sim(v1, v2)` → float [0.0, 1.0] | `src/ytaimbot_ml/quality/similarity_gate.py` | S | T-270 | — |
-| T-273 | 🔲 | Реалізувати `check(new_script, archive)` → SimilarityReport | `src/ytaimbot_ml/quality/similarity_gate.py` | L | T-270 | — |
-| T-274 | 🔲 | Реалізувати `content_hash(text)` → str (SHA-256) | `src/ytaimbot_ml/quality/similarity_gate.py` | S | T-270 | — |
-| T-275 | 🔲 | Інтегрувати SimilarityGate у Pipeline (перед BayesGate) | `modules/orchestrator.py` | M | T-270, T-008 | — |
-| T-276 | 🔲 | Написати тести для SimilarityGate | `tests/test_similarity_gate.py` | M | T-270 | — |
-| T-277 | 🔲 | Тест: ідентичний текст → similarity = 1.0 → "block" | `tests/test_similarity_gate.py` | S | T-276 | — |
-| T-278 | 🔲 | Тест: абсолютно різний текст → similarity < 0.1 → "pass" | `tests/test_similarity_gate.py` | S | T-276 | — |
-| T-279 | 🔲 | Тест: порожній архів → "pass" (немає з чим порівнювати) | `tests/test_similarity_gate.py` | S | T-276 | — |
-| T-280 | 🔲 | Тест: content_hash — однаковий текст → однаковий hash | `tests/test_similarity_gate.py` | S | T-276 | — |
+| T-269 | ✅ | Створити `SimilarityReport` dataclass у schemas.py | `src/ytaimbot_ml/schemas.py` | S | T-002 | 2026-03-22 |
+| T-270 | ✅ | Реалізувати `SimilarityGate` клас | `src/ytaimbot_ml/quality/similarity_gate.py` | L | T-004, T-269 | 2026-03-22 |
+| T-271 | ✅ | Реалізувати `tfidf_vectorize(text)` → np.ndarray | `src/ytaimbot_ml/quality/similarity_gate.py` | M | T-270 | 2026-03-22 |
+| T-272 | ✅ | Реалізувати `cosine_sim(v1, v2)` → float [0.0, 1.0] | `src/ytaimbot_ml/quality/similarity_gate.py` | S | T-270 | 2026-03-22 |
+| T-273 | ✅ | Реалізувати `check(new_script, archive)` → SimilarityReport | `src/ytaimbot_ml/quality/similarity_gate.py` | L | T-270 | 2026-03-22 |
+| T-274 | ✅ | Реалізувати `content_hash(text)` → str (SHA-256) | `src/ytaimbot_ml/quality/similarity_gate.py` | S | T-270 | 2026-03-22 |
+| T-275 | ✅ | Інтегрувати SimilarityGate у Pipeline (перед BayesGate) | `modules/orchestrator.py` | M | T-270, T-008 | 2026-03-22 |
+| T-276 | ✅ | Написати тести для SimilarityGate | `tests/test_similarity_gate.py` | M | T-270 | 2026-03-22 |
+| T-277 | ✅ | Тест: ідентичний текст → similarity = 1.0 → "block" | `tests/test_similarity_gate.py` | S | T-276 | 2026-03-22 |
+| T-278 | ✅ | Тест: абсолютно різний текст → similarity < 0.1 → "pass" | `tests/test_similarity_gate.py` | S | T-276 | 2026-03-22 |
+| T-279 | ✅ | Тест: порожній архів → "pass" (немає з чим порівнювати) | `tests/test_similarity_gate.py" | S | T-276 | 2026-03-22 |
+| T-280 | ✅ | Тест: content_hash — однаковий текст → однаковий hash | `tests/test_similarity_gate.py` | S | T-276 | 2026-03-22 |
 
 ---
 
@@ -1938,21 +1938,21 @@ CREATE INDEX IF NOT EXISTS idx_videos_published ON videos(published_at);
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-311 | 🔲 | Реалізувати `SQLiteStorageAdapter` клас | `modules/adapters/sqlite_storage.py` | L | T-006 | — |
-| T-312 | 🔲 | Реалізувати schema migration system (version table) | `modules/adapters/sqlite_storage.py` | M | T-311 | — |
-| T-313 | 🔲 | Реалізувати `create_tables()` — DDL з вище | `modules/adapters/sqlite_storage.py` | M | T-311 | — |
-| T-314 | 🔲 | Реалізувати `save_video(video)` → None (upsert) | `modules/adapters/sqlite_storage.py` | M | T-311 | — |
-| T-315 | 🔲 | Реалізувати `save_metrics(metrics)` → None (UNIQUE constraint) | `modules/adapters/sqlite_storage.py` | M | T-311 | — |
-| T-316 | 🔲 | Реалізувати `get_video(video_id)` → Video | None | `modules/adapters/sqlite_storage.py` | M | T-311 | — |
-| T-317 | 🔲 | Реалізувати `get_top_videos(n=10, metric="rpm")` → list[Video] | `modules/adapters/sqlite_storage.py` | M | T-311 | — |
-| T-318 | 🔲 | Реалізувати `get_all_scripts()` → list[str] (для SimilarityGate) | `modules/adapters/sqlite_storage.py` | M | T-311 | — |
-| T-319 | 🔲 | Реалізувати `save_ab_test(ab_test)` та `get_ab_tests(video_id)` | `modules/adapters/sqlite_storage.py` | M | T-311 | — |
-| T-320 | 🔲 | Замінити `InMemoryStorage` на `SQLiteStorageAdapter` у Pipeline | `modules/orchestrator.py` | M | T-311 | — |
-| T-321 | 🔲 | Додати `STORAGE_BACKEND=sqlite` env var логіку у Pipeline | `modules/orchestrator.py` | S | T-320 | — |
-| T-322 | 🔲 | Написати тести для SQLiteStorageAdapter (in-memory SQLite `:memory:`) | `tests/test_sqlite_storage.py` | M | T-311 | — |
-| T-323 | 🔲 | Тест: save_video + get_video → roundtrip без втрати даних | `tests/test_sqlite_storage.py` | M | T-322 | — |
-| T-324 | 🔲 | Тест: UNIQUE constraint на metrics → дублікат ігнорується | `tests/test_sqlite_storage.py` | M | T-322 | — |
-| T-325 | 🔲 | Тест: migration → таблиці створюються при першому запуску | `tests/test_sqlite_storage.py` | M | T-322 | — |
+| T-311 | ✅ | Реалізувати `SQLiteStorageAdapter` клас | `modules/adapters/storage/sqlite.py` | L | T-006 | 2026-03-22 |
+| T-312 | ✅ | Реалізувати schema migration system (version table) | `modules/adapters/storage/sqlite.py` | M | T-311 | 2026-03-22 |
+| T-313 | ✅ | Реалізувати `create_tables()` — DDL з вище | `modules/adapters/storage/sqlite.py` | M | T-311 | 2026-03-22 |
+| T-314 | ✅ | Реалізувати `save_video(video)` → None (upsert) | `modules/adapters/storage/sqlite.py` | M | T-311 | 2026-03-22 |
+| T-315 | ✅ | Реалізувати `save_metrics(metrics)` → None (UNIQUE constraint) | `modules/adapters/storage/sqlite.py` | M | T-311 | 2026-03-22 |
+| T-316 | ✅ | Реалізувати `get_video(video_id)` → Video | `modules/adapters/storage/sqlite.py` | M | T-311 | 2026-03-22 |
+| T-317 | ✅ | Реалізувати `get_top_videos(n=10, metric="rpm")` → list[Video] | `modules/adapters/storage/sqlite.py` | M | T-311 | 2026-03-22 |
+| T-318 | ✅ | Реалізувати `load_archive()` → dict[str, str] (для SimilarityGate) | `modules/adapters/storage/sqlite.py` | M | T-311 | 2026-03-22 |
+| T-319 | ✅ | Реалізувати `save_ab_test(ab_test)` та `get_ab_tests(video_id)` | `modules/adapters/storage/sqlite.py` | M | T-311 | 2026-03-22 |
+| T-320 | ✅ | Замінити `InMemoryStorage` на `SQLiteStorageAdapter` у Pipeline | `modules/orchestrator.py` | M | T-311 | 2026-03-22 |
+| T-321 | ✅ | Додати `STORAGE_BACKEND=sqlite` env var логіку у Pipeline | `modules/orchestrator.py` | S | T-320 | 2026-03-22 |
+| T-322 | ✅ | Написати тести для SQLiteStorageAdapter (in-memory SQLite `:memory:`) | `tests/unit/test_sqlite_storage.py` | M | T-311 | 2026-03-22 |
+| T-323 | ✅ | Тест: save_video + get_video → roundtrip без втрати даних | `tests/unit/test_sqlite_storage.py` | M | T-322 | 2026-03-22 |
+| T-324 | ✅ | Тест: UNIQUE constraint на metrics → дублікат ігнорується | `tests/unit/test_sqlite_storage.py` | M | T-322 | 2026-03-22 |
+| T-325 | ✅ | Тест: migration → таблиці створюються при першому запуску | `tests/unit/test_sqlite_storage.py` | M | T-322 | 2026-03-22 |
 
 ---
 
@@ -1987,18 +1987,18 @@ MetricsCollector.collect(video_id: str, published_at: datetime) -> MetricsSnapsh
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-326 | 🔲 | Створити `MetricsSnapshot` dataclass у schemas.py | `src/ytaimbot_ml/schemas.py` | S | T-002 | — |
-| T-327 | 🔲 | Реалізувати `MetricsCollector` клас | `modules/metrics_collector.py` | L | T-241, T-326 | — |
-| T-328 | 🔲 | Реалізувати `collect(video_id, published_at)` → MetricsSnapshot | `modules/metrics_collector.py` | L | T-327 | — |
-| T-329 | 🔲 | Реалізувати 48-годинну затримку (TooEarlyError) | `modules/metrics_collector.py` | M | T-328 | — |
-| T-330 | 🔲 | Реалізувати `collect_all_pending()` → list[MetricsSnapshot] | `modules/metrics_collector.py` | M | T-327 | — |
-| T-331 | 🔲 | Реалізувати збереження у SQLiteStorageAdapter | `modules/metrics_collector.py` | M | T-315, T-328 | — |
-| T-332 | 🔲 | Реалізувати `@retry` для Analytics API викликів | `modules/metrics_collector.py` | S | T-017, T-328 | — |
-| T-333 | 🔲 | Написати тести (mock googleapiclient Analytics) | `tests/test_metrics_collector.py` | M | T-327 | — |
-| T-334 | 🔲 | Тест: collect() для відео < 48h → TooEarlyError | `tests/test_metrics_collector.py` | S | T-333 | — |
-| T-335 | 🔲 | Тест: collect() повертає MetricsSnapshot з усіма полями | `tests/test_metrics_collector.py` | M | T-333 | — |
-| T-336 | 🔲 | Тест: дані зберігаються у SQLite після collect() | `tests/test_metrics_collector.py` | M | T-333 | — |
-| T-337 | 🔲 | Тест: жодних реальних API викликів у тестах | `tests/test_metrics_collector.py` | S | T-333 | — |
+| T-326 | ✅ | Створити `MetricsSnapshot` dataclass у schemas.py | `src/ytaimbot_ml/schemas.py` | S | T-002 | 2026-03-22 |
+| T-327 | ✅ | Реалізувати `MetricsCollector` клас | `modules/metrics_collector.py` | L | T-241, T-326 | 2026-03-22 |
+| T-328 | ✅ | Реалізувати `collect(video_id, published_at)` → MetricsSnapshot | `modules/metrics_collector.py` | L | T-327 | 2026-03-22 |
+| T-329 | ✅ | Реалізувати 48-годинну затримку (TooEarlyError) | `modules/metrics_collector.py` | M | T-328 | 2026-03-22 |
+| T-330 | ✅ | Реалізувати `collect_all_pending()` → list[MetricsSnapshot] | `modules/metrics_collector.py` | M | T-327 | 2026-03-22 |
+| T-331 | ✅ | Реалізувати збереження у SQLiteStorageAdapter | `modules/metrics_collector.py` | M | T-315, T-328 | 2026-03-22 |
+| T-332 | ✅ | Реалізувати `@retry` для Analytics API викликів | `modules/metrics_collector.py` | S | T-017, T-328 | 2026-03-22 |
+| T-333 | ✅ | Написати тести (mock googleapiclient Analytics) | `tests/unit/test_metrics_collector.py` | M | T-327 | 2026-03-22 |
+| T-334 | ✅ | Тест: collect() для відео < 48h → TooEarlyError | `tests/unit/test_metrics_collector.py` | S | T-333 | 2026-03-22 |
+| T-335 | ✅ | Тест: collect() повертає MetricsSnapshot з усіма полями | `tests/unit/test_metrics_collector.py` | M | T-333 | 2026-03-22 |
+| T-336 | ✅ | Тест: дані зберігаються у SQLite після collect() | `tests/unit/test_metrics_collector.py` | M | T-333 | 2026-03-22 |
+| T-337 | ✅ | Тест: жодних реальних API викликів у тестах | `tests/unit/test_metrics_collector.py` | S | T-333 | 2026-03-22 |
 
 ---
 
@@ -2036,17 +2036,17 @@ class FeedbackScorer:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-338 | 🔲 | Створити `src/ytaimbot_ml/feedback/` пакет | `src/ytaimbot_ml/feedback/__init__.py` | S | T-003 | — |
-| T-339 | 🔲 | Реалізувати `FeedbackScorer` клас | `src/ytaimbot_ml/feedback/scorer.py` | L | T-338, T-326 | — |
-| T-340 | 🔲 | Реалізувати `update(niche, metrics)` → float (EMA) | `src/ytaimbot_ml/feedback/scorer.py` | M | T-339 | — |
-| T-341 | 🔲 | Реалізувати `_performance_signal(metrics)` → float [0.0, 1.0] | `src/ytaimbot_ml/feedback/scorer.py` | M | T-339 | — |
-| T-342 | 🔲 | Реалізувати safety bounds (±20% per week) | `src/ytaimbot_ml/feedback/scorer.py` | M | T-340 | — |
-| T-343 | 🔲 | Реалізувати `get_weights()` → dict[str, float] | `src/ytaimbot_ml/feedback/scorer.py` | S | T-339 | — |
-| T-344 | 🔲 | Реалізувати persist weights у SQLite | `src/ytaimbot_ml/feedback/scorer.py` | M | T-339 | — |
-| T-345 | 🔲 | Написати тести для FeedbackScorer | `tests/test_feedback_scorer.py` | M | T-339 | — |
-| T-346 | 🔲 | Тест: EMA — новий weight між old та signal | `tests/test_feedback_scorer.py` | M | T-345 | — |
-| T-347 | 🔲 | Тест: safety bounds — зміна ≤ 20% | `tests/test_feedback_scorer.py` | M | T-345 | — |
-| T-348 | 🔲 | Тест: детермінізм — однаковий seed → однакові weights | `tests/test_feedback_scorer.py` | M | T-345 | — |
+| T-338 | ✅ | Створити `src/ytaimbot_ml/feedback/` пакет | `src/ytaimbot_ml/feedback/__init__.py` | S | T-003 | 2026-03-22 |
+| T-339 | ✅ | Реалізувати `FeedbackScorer` клас | `src/ytaimbot_ml/feedback/scorer.py` | L | T-338, T-326 | 2026-03-22 |
+| T-340 | ✅ | Реалізувати `update(niche, metrics)` → float (EMA) | `src/ytaimbot_ml/feedback/scorer.py` | M | T-339 | 2026-03-22 |
+| T-341 | ✅ | Реалізувати `_performance_signal(metrics)` → float [0.0, 1.0] | `src/ytaimbot_ml/feedback/scorer.py` | M | T-339 | 2026-03-22 |
+| T-342 | ✅ | Реалізувати safety bounds (±20% per week) | `src/ytaimbot_ml/feedback/scorer.py` | M | T-340 | 2026-03-22 |
+| T-343 | ✅ | Реалізувати `get_weights()` → dict[str, float] | `src/ytaimbot_ml/feedback/scorer.py` | S | T-339 | 2026-03-22 |
+| T-344 | ✅ | Реалізувати persist weights у SQLite | `src/ytaimbot_ml/feedback/scorer.py` | M | T-339 | 2026-03-22 |
+| T-345 | ✅ | Написати тести для FeedbackScorer | `tests/unit/test_feedback_scorer.py` | M | T-339 | 2026-03-22 |
+| T-346 | ✅ | Тест: EMA — новий weight між old та signal | `tests/unit/test_feedback_scorer.py` | M | T-345 | 2026-03-22 |
+| T-347 | ✅ | Тест: safety bounds — зміна ≤ 20% | `tests/unit/test_feedback_scorer.py` | M | T-345 | 2026-03-22 |
+| T-348 | ✅ | Тест: детермінізм — однаковий seed → однакові weights | `tests/unit/test_feedback_scorer.py` | M | T-345 | 2026-03-22 |
 
 ---
 
@@ -2087,17 +2087,17 @@ def is_significant(variant_a: dict, variant_b: dict,
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-349 | 🔲 | Створити `ABTestResult` dataclass у schemas.py | `src/ytaimbot_ml/schemas.py` | S | T-002 | — |
-| T-350 | 🔲 | Реалізувати `ABTester` клас | `src/ytaimbot_ml/feedback/ab_tester.py` | L | T-338, T-349 | — |
-| T-351 | 🔲 | Реалізувати `record_impression(video_id, variant)` → None (O(1)) | `src/ytaimbot_ml/feedback/ab_tester.py` | M | T-350 | — |
-| T-352 | 🔲 | Реалізувати `record_click(video_id, variant)` → None (O(1)) | `src/ytaimbot_ml/feedback/ab_tester.py` | M | T-350 | — |
-| T-353 | 🔲 | Реалізувати `analyze(video_id)` → ABTestResult (Chi-Square) | `src/ytaimbot_ml/feedback/ab_tester.py` | L | T-350 | — |
-| T-354 | 🔲 | Реалізувати мінімальний розмір вибірки (1000 показів) | `src/ytaimbot_ml/feedback/ab_tester.py` | M | T-350 | — |
-| T-355 | 🔲 | Реалізувати persist у SQLite (ab_tests таблиця) | `src/ytaimbot_ml/feedback/ab_tester.py` | M | T-350, T-319 | — |
-| T-356 | 🔲 | Написати тести для ABTester | `tests/test_ab_tester.py` | M | T-350 | — |
-| T-357 | 🔲 | Тест: < 1000 показів → "inconclusive" (не робимо висновків) | `tests/test_ab_tester.py` | M | T-356 | — |
-| T-358 | 🔲 | Тест: явна різниця в CTR → p_value < 0.05, winner визначено | `tests/test_ab_tester.py` | M | T-356 | — |
-| T-359 | 🔲 | Тест: однакові CTR → "inconclusive" | `tests/test_ab_tester.py` | M | T-356 | — |
+| T-349 | ✅ | Створити `ABTestResult` dataclass у schemas.py | `src/ytaimbot_ml/schemas.py` | S | T-002 | 2026-03-22 |
+| T-350 | ✅ | Реалізувати `ABTester` клас | `src/ytaimbot_ml/feedback/ab_tester.py` | L | T-338, T-349 | 2026-03-22 |
+| T-351 | ✅ | Реалізувати `record_impression(video_id, variant)` → None (O(1)) | `src/ytaimbot_ml/feedback/ab_tester.py` | M | T-350 | 2026-03-22 |
+| T-352 | ✅ | Реалізувати `record_click(video_id, variant)` → None (O(1)) | `src/ytaimbot_ml/feedback/ab_tester.py` | M | T-350 | 2026-03-22 |
+| T-353 | ✅ | Реалізувати `analyze(video_id)` → ABTestResult (Chi-Square) | `src/ytaimbot_ml/feedback/ab_tester.py` | L | T-350 | 2026-03-22 |
+| T-354 | ✅ | Реалізувати мінімальний розмір вибірки (1000 показів) | `src/ytaimbot_ml/feedback/ab_tester.py` | M | T-350 | 2026-03-22 |
+| T-355 | ✅ | Реалізувати persist у SQLite (ab_tests таблиця) | `src/ytaimbot_ml/feedback/ab_tester.py` | M | T-350, T-319 | 2026-03-22 |
+| T-356 | ✅ | Написати тести для ABTester | `tests/unit/test_ab_tester.py` | M | T-350 | 2026-03-22 |
+| T-357 | ✅ | Тест: < 1000 показів → "inconclusive" (не робимо висновків) | `tests/unit/test_ab_tester.py` | M | T-356 | 2026-03-22 |
+| T-358 | ✅ | Тест: явна різниця в CTR → p_value < 0.05, winner визначено | `tests/unit/test_ab_tester.py` | M | T-356 | 2026-03-22 |
+| T-359 | ✅ | Тест: однакові CTR → "inconclusive" | `tests/unit/test_ab_tester.py` | M | T-356 | 2026-03-22 |
 
 ---
 
@@ -2230,21 +2230,21 @@ class UCB1Bandit:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-381 | 🔲 | Створити `src/ytaimbot_ml/learner/` пакет | `src/ytaimbot_ml/learner/__init__.py` | S | T-003 | — |
-| T-382 | 🔲 | Реалізувати `UCB1Bandit` клас | `src/ytaimbot_ml/learner/bandit.py` | L | T-381 | — |
-| T-383 | 🔲 | Реалізувати `select()` → str (ніша) з UCB1 формулою | `src/ytaimbot_ml/learner/bandit.py` | M | T-382 | — |
-| T-384 | 🔲 | Реалізувати `update(niche, reward)` → None (O(1)) | `src/ytaimbot_ml/learner/bandit.py` | S | T-382 | — |
-| T-385 | 🔲 | Реалізувати `_compute_reward(metrics)` → float [0.0, 1.0] | `src/ytaimbot_ml/learner/bandit.py` | M | T-382 | — |
-| T-386 | 🔲 | Реалізувати `SoftmaxBandit` як альтернативу UCB1 | `src/ytaimbot_ml/learner/bandit.py` | M | T-382 | — |
-| T-387 | 🔲 | Реалізувати persist bandit state у SQLite | `src/ytaimbot_ml/learner/bandit.py` | M | T-382, T-311 | — |
-| T-388 | 🔲 | Реалізувати `get_stats()` → dict[niche → BanditStats] | `src/ytaimbot_ml/learner/bandit.py` | S | T-382 | — |
-| T-389 | 🔲 | Реалізувати холодний старт: рівномірне дослідження перших `k` відео | `src/ytaimbot_ml/learner/bandit.py` | M | T-382 | — |
-| T-390 | 🔲 | Написати тести для UCB1Bandit | `tests/test_bandit.py` | M | T-382 | — |
-| T-391 | 🔲 | Тест: після 100 ітерацій — найкраща ніша обирається частіше | `tests/test_bandit.py` | L | T-390 | — |
-| T-392 | 🔲 | Тест: нова ніша (count=0) обирається першою (exploration) | `tests/test_bandit.py` | M | T-390 | — |
-| T-393 | 🔲 | Тест: UCB1 regret sub-linear відносно random policy | `tests/test_bandit.py` | L | T-390 | — |
-| T-394 | 🔲 | Тест: детермінізм — seed → однакова послідовність виборів | `tests/test_bandit.py` | M | T-390 | — |
-| T-395 | 🔲 | Тест: persist + restore → state не змінюється | `tests/test_bandit.py` | M | T-390 | — |
+| T-381 | ✅ | Створити `src/ytaimbot_ml/learner/` пакет | `src/ytaimbot_ml/learner/__init__.py` | S | T-003 | 2026-03-22 |
+| T-382 | ✅ | Реалізувати `UCB1Bandit` клас | `src/ytaimbot_ml/learner/bandit.py` | L | T-381 | 2026-03-22 |
+| T-383 | ✅ | Реалізувати `select()` → str (ніша) з UCB1 формулою | `src/ytaimbot_ml/learner/bandit.py` | M | T-382 | 2026-03-22 |
+| T-384 | ✅ | Реалізувати `update(niche, reward)` → None (O(1)) | `src/ytaimbot_ml/learner/bandit.py` | S | T-382 | 2026-03-22 |
+| T-385 | ✅ | Реалізувати `_compute_reward(metrics)` → float [0.0, 1.0] | `src/ytaimbot_ml/learner/bandit.py` | M | T-382 | 2026-03-22 |
+| T-386 | ✅ | Реалізувати `SoftmaxBandit` як альтернативу UCB1 | `src/ytaimbot_ml/learner/bandit.py` | M | T-382 | 2026-03-22 |
+| T-387 | ✅ | Реалізувати persist bandit state у SQLite | `src/ytaimbot_ml/learner/bandit.py` | M | T-382, T-311 | 2026-03-22 |
+| T-388 | ✅ | Реалізувати `get_stats()` → dict[niche → BanditStats] | `src/ytaimbot_ml/learner/bandit.py` | S | T-382 | 2026-03-22 |
+| T-389 | ✅ | Реалізувати холодний старт: рівномірне дослідження перших `k` відео | `src/ytaimbot_ml/learner/bandit.py` | M | T-382 | 2026-03-22 |
+| T-390 | ✅ | Написати тести для UCB1Bandit | `tests/unit/test_bandit.py` | M | T-382 | 2026-03-22 |
+| T-391 | ✅ | Тест: після 100 ітерацій — найкраща ніша обирається частіше | `tests/unit/test_bandit.py` | L | T-390 | 2026-03-22 |
+| T-392 | ✅ | Тест: нова ніша (count=0) обирається першою (exploration) | `tests/unit/test_bandit.py` | M | T-390 | 2026-03-22 |
+| T-393 | ✅ | Тест: UCB1 regret sub-linear відносно random policy | `tests/unit/test_bandit.py` | L | T-390 | 2026-03-22 |
+| T-394 | ✅ | Тест: детермінізм — seed → однакова послідовність виборів | `tests/unit/test_bandit.py` | M | T-390 | 2026-03-22 |
+| T-395 | ✅ | Тест: persist + restore → state не змінюється | `tests/unit/test_bandit.py` | M | T-390 | 2026-03-22 |
 
 **Acceptance для EPIC 6.1:**
 - [ ] UCB1 regret: sub-linear відносно random (тест T-393)
@@ -2315,18 +2315,18 @@ def reservoir_sample(stream: Iterator[float],
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-396 | 🔲 | Створити `DriftReport` dataclass у schemas.py | `src/ytaimbot_ml/schemas.py` | S | T-002 | — |
-| T-397 | 🔲 | Реалізувати `KSDriftDetector` клас | `src/ytaimbot_ml/learner/drift_detector.py` | L | T-381, T-396 | — |
-| T-398 | 🔲 | Реалізувати `check(reference, current)` → DriftReport (KS-test) | `src/ytaimbot_ml/learner/drift_detector.py` | L | T-397 | — |
-| T-399 | 🔲 | Реалізувати `reservoir_sample(stream, k, rng)` (Vitter's Algorithm R) | `src/ytaimbot_ml/learner/drift_detector.py` | M | T-397 | — |
-| T-400 | 🔲 | Реалізувати `_collect_reference_window(days=30)` → list[float] | `src/ytaimbot_ml/learner/drift_detector.py` | M | T-397, T-317 | — |
-| T-401 | 🔲 | Реалізувати `_collect_current_window(days=7)` → list[float] | `src/ytaimbot_ml/learner/drift_detector.py` | M | T-397, T-317 | — |
-| T-402 | 🔲 | Реалізувати auto-reset bandit при drift_detected=True | `src/ytaimbot_ml/learner/drift_detector.py` | M | T-397, T-382 | — |
-| T-403 | 🔲 | Написати тести для KSDriftDetector | `tests/test_drift_detector.py` | M | T-397 | — |
-| T-404 | 🔲 | Тест: однакові розподіли → p_value > 0.05 → "continue" | `tests/test_drift_detector.py` | M | T-403 | — |
-| T-405 | 🔲 | Тест: різні розподіли (N(0,1) vs N(5,1)) → drift detected | `tests/test_drift_detector.py` | M | T-403 | — |
-| T-406 | 🔲 | Тест: reservoir_sample — всі елементи мають рівну ймовірність | `tests/test_drift_detector.py` | L | T-403 | — |
-| T-407 | 🔲 | Тест: drift → bandit state скидається | `tests/test_drift_detector.py` | M | T-403 | — |
+| T-396 | ✅ | Створити `DriftReport` dataclass у schemas.py | `src/ytaimbot_ml/schemas.py` | S | T-002 | 2026-03-22 |
+| T-397 | ✅ | Реалізувати `KSDriftDetector` клас | `src/ytaimbot_ml/learner/drift_detector.py` | L | T-381, T-396 | 2026-03-22 |
+| T-398 | ✅ | Реалізувати `check(reference, current)` → DriftReport (KS-test) | `src/ytaimbot_ml/learner/drift_detector.py` | L | T-397 | 2026-03-22 |
+| T-399 | ✅ | Реалізувати `reservoir_sample(stream, k, rng)` (Vitter's Algorithm R) | `src/ytaimbot_ml/learner/drift_detector.py` | M | T-397 | 2026-03-22 |
+| T-400 | ✅ | Реалізувати `_collect_reference_window(days=30)` → list[float] | `src/ytaimbot_ml/learner/drift_detector.py` | M | T-397, T-317 | 2026-03-22 |
+| T-401 | ✅ | Реалізувати `_collect_current_window(days=7)` → list[float] | `src/ytaimbot_ml/learner/drift_detector.py` | M | T-397, T-317 | 2026-03-22 |
+| T-402 | ✅ | Реалізувати auto-reset bandit при drift_detected=True | `src/ytaimbot_ml/learner/drift_detector.py` | M | T-397, T-382 | 2026-03-22 |
+| T-403 | ✅ | Написати тести для KSDriftDetector | `tests/unit/test_drift_detector.py` | M | T-397 | 2026-03-22 |
+| T-404 | ✅ | Тест: однакові розподіли → p_value > 0.05 → "continue" | `tests/unit/test_drift_detector.py` | M | T-403 | 2026-03-22 |
+| T-405 | ✅ | Тест: різні розподіли (N(0,1) vs N(5,1)) → drift detected | `tests/unit/test_drift_detector.py` | M | T-403 | 2026-03-22 |
+| T-406 | ✅ | Тест: reservoir_sample — всі елементи мають рівну ймовірність | `tests/unit/test_drift_detector.py` | L | T-403 | 2026-03-22 |
+| T-407 | ✅ | Тест: drift → bandit state скидається | `tests/unit/test_drift_detector.py` | M | T-403 | 2026-03-22 |
 
 ---
 
@@ -2366,18 +2366,18 @@ class LinearPPO:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-408 | 🔲 | Визначити `ContentAction` та `ContentState` dataclasses | `src/ytaimbot_ml/schemas.py` | M | T-002 | — |
-| T-409 | 🔲 | Реалізувати `LinearPPO` клас (без PyTorch для MVP) | `src/ytaimbot_ml/learner/optimizer.py` | XL | T-381 | — |
-| T-410 | 🔲 | Реалізувати `select_action(state)` → ContentAction (softmax) | `src/ytaimbot_ml/learner/optimizer.py` | L | T-409 | — |
-| T-411 | 🔲 | Реалізувати `update(trajectory)` → float (PPO loss) | `src/ytaimbot_ml/learner/optimizer.py` | XL | T-409 | — |
-| T-412 | 🔲 | Реалізувати `_compute_advantages(trajectory)` → np.ndarray | `src/ytaimbot_ml/learner/optimizer.py` | L | T-409 | — |
-| T-413 | 🔲 | Реалізувати PPO clip: `clip(r_t, 1-ε, 1+ε)` | `src/ytaimbot_ml/learner/optimizer.py` | M | T-409 | — |
-| T-414 | 🔲 | Реалізувати `save_policy(path)` та `load_policy(path)` | `src/ytaimbot_ml/learner/optimizer.py` | M | T-409 | — |
-| T-415 | 🔲 | Написати тести для LinearPPO | `tests/test_ppo_optimizer.py` | L | T-409 | — |
-| T-416 | 🔲 | Тест: update() зменшує loss після кількох ітерацій | `tests/test_ppo_optimizer.py` | L | T-415 | — |
-| T-417 | 🔲 | Тест: clipping — ratio не виходить за [1-ε, 1+ε] | `tests/test_ppo_optimizer.py` | M | T-415 | — |
-| T-418 | 🔲 | Тест: save + load policy → ідентичні дії | `tests/test_ppo_optimizer.py` | M | T-415 | — |
-| T-419 | 🔲 | Тест: детермінізм при однаковому seed | `tests/test_ppo_optimizer.py` | M | T-415 | — |
+| T-408 | ✅ | Визначити `ContentAction` та `ContentState` dataclasses | `src/ytaimbot_ml/schemas.py` | M | T-002 | 2026-03-22 |
+| T-409 | ✅ | Реалізувати `LinearPPO` клас (без PyTorch для MVP) | `src/ytaimbot_ml/learner/optimizer.py` | XL | T-381 | 2026-03-22 |
+| T-410 | ✅ | Реалізувати `select_action(state)` → ContentAction (softmax) | `src/ytaimbot_ml/learner/optimizer.py` | L | T-409 | 2026-03-22 |
+| T-411 | ✅ | Реалізувати `update(trajectory)` → float (PPO loss) | `src/ytaimbot_ml/learner/optimizer.py` | XL | T-409 | 2026-03-22 |
+| T-412 | ✅ | Реалізувати `_compute_advantages(trajectory)` → np.ndarray | `src/ytaimbot_ml/learner/optimizer.py` | L | T-409 | 2026-03-22 |
+| T-413 | ✅ | Реалізувати PPO clip: `clip(r_t, 1-ε, 1+ε)` | `src/ytaimbot_ml/learner/optimizer.py` | M | T-409 | 2026-03-22 |
+| T-414 | ✅ | Реалізувати `save_policy(path)` та `load_policy(path)` | `src/ytaimbot_ml/learner/optimizer.py` | M | T-409 | 2026-03-22 |
+| T-415 | ✅ | Написати тести для LinearPPO | `tests/unit/test_ppo_optimizer.py` | L | T-409 | 2026-03-22 |
+| T-416 | ✅ | Тест: update() зменшує loss після кількох ітерацій | `tests/unit/test_ppo_optimizer.py` | L | T-415 | 2026-03-22 |
+| T-417 | ✅ | Тест: clipping — ratio не виходить за [1-ε, 1+ε] | `tests/unit/test_ppo_optimizer.py` | M | T-415 | 2026-03-22 |
+| T-418 | ✅ | Тест: save + load policy → ідентичні дії | `tests/unit/test_ppo_optimizer.py` | M | T-415 | 2026-03-22 |
+| T-419 | ✅ | Тест: детермінізм при однаковому seed | `tests/unit/test_ppo_optimizer.py` | M | T-415 | 2026-03-22 |
 
 ---
 
@@ -2431,14 +2431,14 @@ def create_video_backend(config: Config) -> VideoAssembler:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-429 | 🔲 | Інтегрувати `UCB1Bandit.select()` у Pipeline._ingest() | `modules/orchestrator.py` | L | T-383, T-008 | — |
-| T-430 | 🔲 | Інтегрувати `UCB1Bandit.update()` після metrics collection | `modules/orchestrator.py` | M | T-384, T-373 | — |
-| T-431 | 🔲 | Інтегрувати `KSDriftDetector` у weekly feedback job | `modules/orchestrator.py` | M | T-398, T-374 | — |
-| T-432 | 🔲 | Інтегрувати `LinearPPO` для вибору content parameters | `modules/orchestrator.py` | L | T-410, T-408 | — |
-| T-433 | 🔲 | Замінити video backend на `create_video_backend(config)` factory | `modules/orchestrator.py` | M | T-423 | — |
-| T-434 | 🔲 | Додати `BANDIT_EXPLORATION_C=2.0` до .env.example | `.env.example` | S | T-383 | — |
-| T-435 | 🔲 | Додати `DRIFT_THRESHOLD=0.05` до .env.example | `.env.example` | S | T-398 | — |
-| T-436 | 🔲 | Додати `PPO_EPSILON=0.2`, `PPO_LR=0.001` до .env.example | `.env.example` | S | T-411 | — |
+| T-429 | ✅ | Інтегрувати `UCB1Bandit.select()` у Pipeline._ingest() | `modules/orchestrator.py` | L | T-383, T-008 | 2026-03-23 |
+| T-430 | ✅ | Інтегрувати `UCB1Bandit.update()` після metrics collection | `modules/orchestrator.py` | M | T-384, T-373 | 2026-03-23 |
+| T-431 | ✅ | Інтегрувати `KSDriftDetector` у weekly feedback job | `modules/orchestrator.py` | M | T-398, T-374 | 2026-03-23 |
+| T-432 | ✅ | Інтегрувати `LinearPPO` для вибору content parameters | `modules/orchestrator.py` | L | T-410, T-408 | 2026-03-23 |
+| T-433 | ✅ | Замінити video backend на `create_video_backend(config)` factory | `modules/orchestrator.py` | M | T-423 | 2026-03-23 |
+| T-434 | ✅ | Додати `BANDIT_EXPLORATION_C=2.0` до .env.example | `.env.example` | S | T-383 | 2026-03-23 |
+| T-435 | ✅ | Додати `DRIFT_THRESHOLD=0.05` до .env.example | `.env.example` | S | T-398 | 2026-03-23 |
+| T-436 | ✅ | Додати `PPO_EPSILON=0.2`, `PPO_LR=0.001` до .env.example | `.env.example` | S | T-411 | 2026-03-23 |
 | T-437 | 🔲 | Написати інтеграційні тести: Bandit + Pipeline + Metrics loop | `tests/test_rl_integration.py` | XL | T-429, T-430 | — |
 | T-438 | 🔲 | Тест: після 20 циклів — bandit конвергує до топ ніші | `tests/test_rl_integration.py` | L | T-437 | — |
 | T-439 | 🔲 | Запустити `pytest -q --tb=short` → всі зелені | CI | S | T-438 | — |
