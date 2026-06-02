@@ -1,133 +1,176 @@
-"""Manual review gate for first-N published videos (Phase 4)."""
+"""Phase 4 — ManualReviewCLI: Human-in-the-loop review system.
+
+Roadmap tasks: T-281 through T-293 (EPIC 4.4 Manual Review CLI)
+
+Algorithm
+---------
+1. Dashboard: Display plan metadata, compliance scores, and similarity results.
+2. Interaction: Wait for user input (a = approve, r = reject).
+3. Logic: Automatically approve if upload_count >= 50 (T-288).
+4. Audit: Append each decision to AuditLog (O(1) write).
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Callable
+import datetime
+import json
+import logging
+import os
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, List, Literal, Optional
 
-from modules.dashboard.audit_log import AuditEntry, AuditLog
-from ytaimbot_ml.schemas import ComplianceReport, ContentPlan
+if TYPE_CHECKING:
+    from ytaimbot_ml.schemas import ContentPlan, PipelineResult
+    from ytaimbot_ml.quality.similarity_gate import SimilarityReport
+
+logger = logging.getLogger(__name__)
+
+_DEFAULT_AUDIT_LOG = Path("data/audit_log.jsonl")
 
 
-@dataclass(frozen=True)
-class ReviewDecision:
-    """Manual review decision for one content plan.
+@dataclass
+class AuditEntry:
+    """Record of a manual or automatic review decision."""
+    timestamp: str
+    video_id: str
+    title: str
+    operator: Literal["human", "ai_agent"]
+    decision: Literal["approve", "reject"]
+    compliance_score: float
+    similarity_score: float
+    content_hash: str
+    reason: str = ""
 
-    Complexity: O(1).
+
+class AuditLog:
+    """Append-only storage for review decisions using JSON Lines format.
+
+    Complexity: O(1) write, O(n) read.
     """
 
-    trend_id: str
-    decision: str  # "approve" | "reject"
-    reason: str
+    def __init__(self, path: str | Path | None = None) -> None:
+        self.path = Path(path) if path else _DEFAULT_AUDIT_LOG
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+
+    def append(self, entry: AuditEntry) -> None:
+        """Add an entry to the log file.  O(1)."""
+        with open(self.path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(asdict(entry), ensure_ascii=False) + "\n")
+
+    def read_all(self) -> List[AuditEntry]:
+        """Read all entries from the log.  O(n)."""
+        if not self.path.exists():
+            return []
+        
+        entries = []
+        with open(self.path, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    entries.append(AuditEntry(**json.loads(line)))
+        return entries
 
 
 class ManualReviewCLI:
-    """Interactive human-in-the-loop publish gate.
+    """CLI dashboard for human content review.
 
-    Strategy
-    --------
-    - First ``manual_quota`` decisions require human approval.
-    - After quota is reached, decisions auto-approve (unless explicitly disabled).
-    - All decisions are persisted to ``AuditLog``.
-
-    Complexity
+    Parameters
     ----------
-    review(): O(n) due to reading decision count from JSONL log.
-
-    Examples
-    --------
-    >>> gate = ManualReviewCLI(AuditLog(path="data/audit/test.jsonl"), input_fn=lambda _: "a", output_fn=lambda _: None)
-    >>> gate.manual_quota >= 1
-    True
+    audit_log:
+        AuditLog instance for persisting decisions.
+    upload_threshold:
+        Number of manual reviews required before switching to full auto.
     """
 
     def __init__(
         self,
-        audit_log: AuditLog,
-        manual_quota: int = 50,
-        input_fn: Callable[[str], str] = input,
-        output_fn: Callable[[str], None] = print,
-        auto_approve_after_quota: bool = True,
-        operator: str = "human",
+        audit_log: AuditLog | None = None,
+        upload_threshold: int = 50,
     ) -> None:
-        self._audit_log = audit_log
-        self._manual_quota = manual_quota
-        self._input_fn = input_fn
-        self._output_fn = output_fn
-        self._auto_after_quota = auto_approve_after_quota
-        self._operator = operator
-
-    @property
-    def manual_quota(self) -> int:
-        """Manual-review quota size. O(1)."""
-        return self._manual_quota
-
-    def needs_manual_review(self) -> bool:
-        """Return True while logged decisions are below quota. O(n)."""
-        return self._audit_log.count_decisions() < self._manual_quota
+        self.audit_log = audit_log or AuditLog()
+        self.threshold = upload_threshold
 
     def review(
         self,
         plan: ContentPlan,
-        report: ComplianceReport,
-        run_id: str,
-    ) -> ReviewDecision:
-        """Review one plan and return approve/reject decision.
+        similarity: SimilarityReport,
+        upload_count: int,
+        compliance_score: float = 0.0,
+    ) -> Literal["approve", "reject"]:
+        """Display content and prompt for approval or reject.
 
-        Fail-closed behavior:
-        - If compliance report is not ``pass``, always reject.
-        - If interactive input is unavailable (EOFError), reject.
+        Algorithm: O(1) decision.
 
-        Complexity: O(n)
+        Parameters
+        ----------
+        plan:
+            The content plan to review.
+        similarity:
+            SimilarityReport with scores and hash.
+        upload_count:
+            Total videos uploaded so far.
+        compliance_score:
+            Score from Bayes quality filter.
+
+        Returns
+        -------
+        Literal["approve", "reject"]
+            The decision.
         """
-        if report.decision != "pass":
-            decision = ReviewDecision(plan.trend_id, "reject", "compliance_fail")
-            self._record(run_id, decision)
-            return decision
+        # Automatic approval after threshold (T-288)
+        if upload_count >= self.threshold:
+            logger.info("ManualReviewCLI: auto-approving (count=%d)", upload_count)
+            self._log_decision(plan, similarity, compliance_score, "ai_agent", "approve")
+            return "approve"
 
-        if not self.needs_manual_review() and self._auto_after_quota:
-            decision = ReviewDecision(plan.trend_id, "approve", "auto_after_quota")
-            self._record(run_id, decision)
-            return decision
+        # Display dashboard (T-287)
+        print("\n" + "=" * 60)
+        print(f" 📺 CONTENT REVIEW (Upload #{upload_count + 1})")
+        print("=" * 60)
+        print(f" Title:      {plan.title}")
+        print(f" Trend ID:   {plan.trend_id}")
+        print(f" Keywords:   {', '.join(plan.keywords[:5])}")
+        print("-" * 60)
+        print(f" Quality (Bayes): {compliance_score:.2f}")
+        print(f" Similarity:      {similarity.score:.2f} ({similarity.decision})")
+        print(f" Content Hash:    {similarity.content_hash[:16]}...")
+        print("=" * 60)
 
-        self._output_fn(f"[ManualReview] trend={plan.trend_id}")
-        self._output_fn(f"Title: {plan.title}")
-        self._output_fn("Decision? [a]pprove / [r]eject")
-        try:
-            action = self._prompt_decision()
-        except EOFError:
-            # Non-interactive environment: fail-closed.
-            decision = ReviewDecision(plan.trend_id, "reject", "manual_input_unavailable")
-            self._record(run_id, decision)
-            return decision
-
-        decision = (
-            ReviewDecision(plan.trend_id, "approve", "manual_approved")
-            if action == "a"
-            else ReviewDecision(plan.trend_id, "reject", "manual_rejected")
-        )
-        self._record(run_id, decision)
-        return decision
-
-    def _prompt_decision(self) -> str:
-        """Prompt until valid input is received. O(k) for retries."""
+        # Interaction (T-286)
         while True:
-            value = self._input_fn("> ").strip().lower()
-            if value in {"a", "approve"}:
-                return "a"
-            if value in {"r", "reject"}:
-                return "r"
-            self._output_fn("Invalid input. Use 'a' or 'r'.")
+            choice = input("\n[A]pprove | [R]eject | [Q]uit: ").lower().strip()
+            if choice == "a":
+                self._log_decision(plan, similarity, compliance_score, "human", "approve")
+                return "approve"
+            elif choice == "r":
+                reason = input("Reason for rejection: ")
+                self._log_decision(plan, similarity, compliance_score, "human", "reject", reason)
+                return "reject"
+            elif choice == "q":
+                logger.info("ManualReviewCLI: user quit")
+                raise KeyboardInterrupt()
+            else:
+                print("Invalid choice, please enter 'a', 'r', or 'q'.")
 
-    def _record(self, run_id: str, decision: ReviewDecision) -> None:
-        """Persist decision to audit log. O(1)."""
-        self._audit_log.append(
-            AuditEntry(
-                run_id=run_id,
-                trend_id=decision.trend_id,
-                decision=decision.decision,
-                reason=decision.reason,
-                operator=self._operator,
-            )
+    def _log_decision(
+        self,
+        plan: ContentPlan,
+        similarity: SimilarityReport,
+        compliance_score: float,
+        operator: Literal["human", "ai_agent"],
+        decision: Literal["approve", "reject"],
+        reason: str = "",
+    ) -> None:
+        """Helper to append a decision to the audit log."""
+        entry = AuditEntry(
+            timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            video_id=plan.trend_id,  # Use trend_id as temporary ID
+            title=plan.title,
+            operator=operator,
+            decision=decision,
+            compliance_score=compliance_score,
+            similarity_score=similarity.score,
+            content_hash=similarity.content_hash,
+            reason=reason,
         )
-
+        self.audit_log.append(entry)
