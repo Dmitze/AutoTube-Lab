@@ -1,0 +1,43 @@
+[Unit]
+# Phase 7 — ytaimbot.service: systemd unit with watchdog (T-446).
+#
+# Usage:
+#   sudo cp ytaimbot.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable ytaimbot
+#   sudo systemctl start ytaimbot
+#
+# Requirements:
+#   - /home/ytaimbot/app/docker-compose.yml
+#   - User ytaimbot
+#
+# Complexity: O(1) management.
+
+Description=YTAIMBot - YouTube AI Money Bot
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=ytaimbot
+WorkingDirectory=/home/ytaimbot/app
+ExecStartPre=-/usr/bin/docker compose -f docker-compose.yml down
+ExecStart=/usr/bin/docker compose -f docker-compose.yml up --build
+ExecStop=/usr/bin/docker compose -f docker-compose.yml down
+
+# Watchdog and Restart Policy (T-447)
+Restart=on-failure
+RestartSec=30
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# Resource Limits
+CPUQuota=100%
+MemoryMax=4G
+
+# Logs
+StandardOutput=append:/var/log/ytaimbot.log
+StandardError=append:/var/log/ytaimbot.error.log
+
+[Install]
+WantedBy=multi-user.target
