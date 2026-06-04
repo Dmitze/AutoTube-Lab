@@ -14,7 +14,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from ytaimbot_ml.schemas import ComplianceReport, ContentPlan, TrendSignal
+from ytaimbot_ml.schemas import ComplianceReport, ContentPlan, TrendSignal, MetricsSnapshot
 
 
 class TrendSourceAdapter(ABC):
