@@ -26,7 +26,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional
 
-from modules.adapters.retry import retry, RetryableError
+from modules.adapters.retry import exponential_backoff # Corrected import
+from modules.adapters.errors import RetryableError # Corrected import
 from ytaimbot_ml.schemas import MetricsSnapshot
 
 if TYPE_CHECKING:
@@ -110,7 +111,7 @@ class MetricsCollector:
         self._service = build("youtubeAnalytics", "v2", credentials=creds)
         return self._service
 
-    @retry(max_retries=3, base_delay=2.0)
+    @exponential_backoff(max_retries=3, base_delay=2.0, jitter=True) # Corrected decorator
     def collect(self, video_id: str, published_at: datetime) -> MetricsSnapshot:
         """Collect metrics for a specific video.
 
