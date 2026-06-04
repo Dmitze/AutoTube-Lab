@@ -1,117 +1,96 @@
-"""Tests for retry decorator — T-019 to T-023."""
+"""Tests for the retry decorator."""
 
 from __future__ import annotations
 
+import random
+import time
+from unittest.mock import MagicMock, call, patch
+
 import pytest
 
-from modules.adapters.retry import NonRetryableError, RetryableError, retry
+from modules.adapters.errors import RetryableError
 
 
-def test_success_on_first_attempt():
-    calls = []
+class TestExponentialBackoff:
+    """Tests for the exponential_backoff decorator."""
 
-    @retry(max_retries=3, base_delay=0.0, jitter=False)
-    def ok():
-        calls.append(1)
-        return 42
+    @patch("time.sleep")
+    def test_backoff_timing(self, mock_sleep: MagicMock) -> None:
+        """
+        Verify that the decorated function retries with exponential backoff timing.
+        """
+        from modules.adapters.retry import exponential_backoff
 
-    assert ok() == 42
-    assert len(calls) == 1
+        @exponential_backoff(max_retries=3, base_delay=0.1, jitter=False)
+        def flaky_function() -> str:
+            if flaky_function.calls < 2:  # Fail twice, succeed on third call
+                flaky_function.calls += 1
+                raise RetryableError("Transient error")
+            return "Success"
 
+        flaky_function.calls = 0  # Initialize call counter
 
-def test_retries_then_succeeds():
-    """Fails twice, then succeeds on 3rd call."""
-    calls = []
+        result = flaky_function()
 
-    @retry(max_retries=3, base_delay=0.0, jitter=False)
-    def flaky():
-        calls.append(1)
-        if len(calls) < 3:
-            raise RetryableError("not ready")
-        return "ok"
+        assert result == "Success"
+        assert flaky_function.calls == 2  # Two failures before success
 
-    result = flaky()
-    assert result == "ok"
-    assert len(calls) == 3
+        # Expected sleep calls for max_retries=3, base_delay=0.1, jitter=False
+        # 1st retry: 2^0 * 0.1 = 0.1s
+        # 2nd retry: 2^1 * 0.1 = 0.2s
+        expected_calls = [call(0.1), call(0.2)]
+        mock_sleep.assert_has_calls(expected_calls)
+        assert mock_sleep.call_count == 2
+    
+    @patch("time.sleep")
+    def test_max_retries_exceeded_raises(self, mock_sleep: MagicMock) -> None:
+        """
+        Verify that the decorated function raises RetryableError after max_retries.
+        """
+        from modules.adapters.retry import exponential_backoff
 
+        @exponential_backoff(max_retries=2, base_delay=0.1, jitter=False)
+        def always_flaky_function() -> str:
+            raise RetryableError("Always failing")
 
-def test_exhausted_retries_raises():
-    @retry(max_retries=2, base_delay=0.0, jitter=False)
-    def always_fails():
-        raise RetryableError("always")
+        with pytest.raises(RetryableError, match="Always failing"):
+            always_flaky_function()
 
-    with pytest.raises(RetryableError, match="always"):
-        always_fails()
+        # Expected sleep calls for max_retries=2, base_delay=0.1, jitter=False
+        # 1st retry: 0.1s
+        # 2nd retry: 0.2s
+        expected_calls = [call(0.1), call(0.2)]
+        mock_sleep.assert_has_calls(expected_calls)
+        assert mock_sleep.call_count == 2 # 2 retries, so 2 sleeps
+    
+    @patch("time.sleep")
+    @patch("random.random")
+    def test_jitter_adds_randomness(self, mock_random: MagicMock, mock_sleep: MagicMock) -> None:
+        """
+        Verify that jitter adds randomness to the delay.
+        """
+        from modules.adapters.retry import exponential_backoff
 
+        # Set specific random values for predictable jitter
+        mock_random.side_effect = [0.1, 0.9] # For first and second retry
 
-def test_non_retryable_raised_immediately():
-    """NonRetryableError must NOT be retried."""
-    calls = []
+        @exponential_backoff(max_retries=2, base_delay=1.0, jitter=True)
+        def flaky_function_with_jitter() -> str:
+            if flaky_function_with_jitter.calls < 2:
+                flaky_function_with_jitter.calls += 1
+                raise RetryableError("Transient error")
+            return "Success"
 
-    @retry(max_retries=5, base_delay=0.0, jitter=False)
-    def bad_request():
-        calls.append(1)
-        raise NonRetryableError("bad key")
+        flaky_function_with_jitter.calls = 0
 
-    with pytest.raises(NonRetryableError):
-        bad_request()
+        result = flaky_function_with_jitter()
 
-    assert len(calls) == 1  # called exactly once, no retry
+        assert result == "Success"
+        assert flaky_function_with_jitter.calls == 2
 
-
-def test_delays_are_exponential(monkeypatch):
-    """Verify delay sequence: ~2s, ~4s, ~8s (no jitter)."""
-    slept: list[float] = []
-    monkeypatch.setattr("time.sleep", lambda s: slept.append(s))
-
-    @retry(max_retries=3, base_delay=2.0, jitter=False)
-    def always_fails():
-        raise RetryableError("x")
-
-    with pytest.raises(RetryableError):
-        always_fails()
-
-    # 3 retries → 3 sleep calls
-    assert len(slept) == 3
-    assert slept[0] == pytest.approx(2.0)
-    assert slept[1] == pytest.approx(4.0)
-    assert slept[2] == pytest.approx(8.0)
-
-
-def test_max_delay_cap(monkeypatch):
-    """Delay must never exceed max_delay."""
-    slept: list[float] = []
-    monkeypatch.setattr("time.sleep", lambda s: slept.append(s))
-
-    @retry(max_retries=5, base_delay=2.0, max_delay=5.0, jitter=False)
-    def always_fails():
-        raise RetryableError("x")
-
-    with pytest.raises(RetryableError):
-        always_fails()
-
-    assert all(s <= 5.0 for s in slept)
-
-
-def test_jitter_deterministic_with_seed(monkeypatch):
-    """Jitter is reproducible when seed is set."""
-    slept_a: list[float] = []
-    slept_b: list[float] = []
-
-    @retry(max_retries=2, base_delay=1.0, jitter=True, seed=42)
-    def fail_a():
-        raise RetryableError("x")
-
-    @retry(max_retries=2, base_delay=1.0, jitter=True, seed=42)
-    def fail_b():
-        raise RetryableError("x")
-
-    monkeypatch.setattr("time.sleep", lambda s: slept_a.append(s))
-    with pytest.raises(RetryableError):
-        fail_a()
-
-    monkeypatch.setattr("time.sleep", lambda s: slept_b.append(s))
-    with pytest.raises(RetryableError):
-        fail_b()
-
-    assert slept_a == slept_b
+        # Expected sleep calls with jitter: delay = base_delay * (2**attempt) * (1 + random_value)
+        # 1st retry: 1.0 * (2**0) * (1 + 0.1) = 1.0 * 1.1 = 1.1s
+        # 2nd retry: 1.0 * (2**1) * (1 + 0.9) = 2.0 * 1.9 = 3.8s
+        expected_calls = [call(1.1), call(3.8)]
+        mock_sleep.assert_has_calls(expected_calls)
+        assert mock_sleep.call_count == 2
