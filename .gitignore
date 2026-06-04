@@ -34,3 +34,4 @@ htmlcov/
 
 # Data directory (runtime output)
 data/
+.hypothesis/
