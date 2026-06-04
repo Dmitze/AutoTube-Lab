@@ -18,3 +18,12 @@ Reward shaping:
 
 Status: 🔲 Pending — T-500 (Phase 6)
 """
+from ytaimbot_ml.learner.optimizer import LinearPPO
+from ytaimbot_ml.rl.reward_shaper import RewardShaper
+from ytaimbot_ml.rl.ucb1_bandit import UCB1Bandit
+
+__all__ = [
+    "LinearPPO",
+    "RewardShaper",
+    "UCB1Bandit",
+]
