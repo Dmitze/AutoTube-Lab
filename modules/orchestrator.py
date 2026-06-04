@@ -1,182 +1,205 @@
-"""MVP pipeline orchestrator.
-
-Stages
-------
-1. ingest          — fetch TrendSignals from source adapter
-2. featurize       — (handled inside TrendAnalyzer.analyze)
-3. reduce          — SVD/PCA dimensionality reduction (inside TrendAnalyzer)
-4. score           — rank trends by magnitude
-5. plan            — generate stub ContentPlans for top-N trends
-6. gate            — compliance check via BayesQualityFilter
-7. generate_script — LLM generates 6-section script per approved plan [Phase 2]
-8. synthesize_tts  — EdgeTTS converts script to MP3 audio              [Phase 2]
-9. assemble_video  — VideoAssembler + ThumbnailGenerator               [Phase 4]
-10. publish        — YouTube upload with QuotaGuard (skip in dry_run)  [Phase 5]
-
-Fail-closed design: publish is NEVER called unless a ComplianceReport
-with decision="pass" exists for the plan AND YTAIMBOT_DRY_RUN=false.
-
-Adapter auto-selection:
-  Trend  (T-069): YOUTUBE_API_KEY + GOOGLE_TRENDS_GEO → CompositeTrendSource
-  LLM    (T-082): GROQ_API_KEY → GroqAdapter | OLLAMA_URL → OllamaAdapter
-  TTS    (T-098): TTS_VOICE set → EdgeTTSAdapter (default uk-UA-OstapNeural)
-  Upload (T-371): YOUTUBE_CLIENT_SECRET_PATH set → YouTubeUploadAdapter
-"""
-
 from __future__ import annotations
 
 import json
 import logging
 import os
-import uuid
 import time
-import numpy as np
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
+from uuid import uuid4
+
+import numpy as np
 
 from modules.adapters.base import (
-    LLMAdapter,
-    PublisherAdapter,
-    StorageAdapter,
-    TTSAdapter,
-    TrendSourceAdapter,
-)
-from modules.adapters.video.assembler import VideoAssembler
-from modules.adapters.video.ai_generator import create_video_backend
-from ytaimbot_ml.quality.bayes_filter import BayesQualityFilter
-from ytaimbot_ml.quality.similarity_gate import SimilarityGate
-from ytaimbot_ml.rl.reward_shaper import RewardShaper
-from ytaimbot_ml.rl.ucb1_bandit import UCB1Bandit
-from ytaimbot_ml.utils.metrics import MetricsRegistry
-from ytaimbot_ml.learner.drift_detector import KSDriftDetector
-from ytaimbot_ml.learner.optimizer import LinearPPO, Transition
-from ytaimbot_ml.schemas import (
     ComplianceReport,
     ContentPlan,
+    PublisherAdapter,
+    StorageAdapter,
+    TrendSignal,
+    TrendSourceAdapter,
+)
+from modules.adapters.llm import build_llm_adapter
+from modules.adapters.tts import build_tts_adapter
+from modules.adapters.video import create_video_backend
+# from modules.metrics_collector import MetricsRegistry # Removed line
+from modules.adapters.retry import exponential_backoff # Modified line
+from ytaimbot_ml.quality import BayesQualityFilter, KSDriftDetector, SimilarityGate
+from ytaimbot_ml.rl import LinearPPO, RewardShaper, UCB1Bandit
+from ytaimbot_ml.schemas import (
+    ContentAction,
+    ContentState,
     PipelineResult,
     Script,
     TrendRanking,
-    TrendSignal,
-    ContentState,
-    ContentAction,
+    MetricsSnapshot # Added
 )
-from ytaimbot_ml.trend_analyzer import TrendAnalyzer
-from ytaimbot_ml.utils.random import make_rng
+# from ytaimbot_ml.seo import TrendAnalyzer # Removed
+from ytaimbot_ml.utils import make_rng
+from ytaimbot_ml.utils.metrics import MetricsRegistry # Added line
+from ytaimbot_ml.trend_analyzer import TrendAnalyzer # Added
+
+if TYPE_CHECKING:
+    # Avoid circular imports for type hinting
+    from modules.adapters.llm import LLMAdapter
+    from modules.adapters.tts import TTSAdapter
+    from modules.adapters.video import VideoAssembler
+
 
 logger = logging.getLogger(__name__)
 
-if TYPE_CHECKING:
-    from modules.dashboard.manual_review import ManualReviewCLI
-    from modules.scheduler import UploadScheduler
-
 
 # ---------------------------------------------------------------------------
-# Adapter factories
+# Dependency Factories (hide complexity of building concrete adapters)
 # ---------------------------------------------------------------------------
 
 
-def build_trend_source(seed: int = 42) -> TrendSourceAdapter:
-    """Auto-select trend source adapter based on environment variables.
+def build_trend_source(config: dict[str, Any]) -> TrendSourceAdapter:
+    """Build the best available trend source adapter.
 
-    Selection logic (T-069):
-
-    +--------------------------+----------------------------+
-    | YOUTUBE_API_KEY present? | GOOGLE_TRENDS_GEO present? |
-    +--------------------------+----------------------------+
-    | Yes                      | Yes → CompositeTrendSource  |
-    | Yes                      | No  → YouTubeSearchTrendSource |
-    | No                       | Yes → GoogleTrendsAdapter |
-    | No                       | No  → SyntheticTrendSource  |
-    +--------------------------+----------------------------+
+    Delegates selection to `modules.adapters.trend.build_trend_source`, which
+    orchestrates a chain of priority: `CompositeTrendSource` (YouTube + Google
+    Trends) -> `GoogleTrendsAdapter` -> `YouTubeSearchAdapter` -> `SyntheticTrendSource`.
 
     Parameters
     ----------
-    seed:
-        RNG seed passed to adapters for deterministic fallback.
+    config:
+        Application configuration dictionary (e.g. from environment variables).
 
     Returns
     -------
     TrendSourceAdapter
-        The most capable adapter available given current env vars.
-
-    Complexity
-    ----------
-    O(1)
+        Configured trend source adapter.
 
     Examples
     --------
-    >>> import os; os.environ.pop("YOUTUBE_API_KEY", None)
-    >>> src = build_trend_source(seed=42)
-    >>> src.__class__.__name__
-    'SyntheticTrendSource'
+    >>> source = build_trend_source({})
+    >>> isinstance(source, TrendSourceAdapter)
+    True
     """
-    has_yt = bool(os.environ.get("YOUTUBE_API_KEY", "").strip())
-    has_gt = bool(os.environ.get("GOOGLE_TRENDS_GEO", "").strip())
+    from modules.adapters.trend import build_trend_source as _build
 
-    if has_yt and has_gt:
-        from modules.adapters.composite import CompositeTrendSource
-        from modules.adapters.google_trends import GoogleTrendsAdapter
-        from modules.adapters.youtube_search import YouTubeSearchTrendSource
-
-        geo = os.environ["GOOGLE_TRENDS_GEO"]
-        weight_str = os.environ.get("ADAPTER_WEIGHTS", "1.0,1.0").split(",")
-        w_gt = float(weight_str[0]) if len(weight_str) > 0 else 1.0
-        w_yt = float(weight_str[1]) if len(weight_str) > 1 else 1.0
-
-        logger.info("TrendSource: CompositeTrendSource (GoogleTrends + YouTube)")
-        return CompositeTrendSource(
-            adapters=[
-                (GoogleTrendsAdapter(geo=geo, seed=seed), w_gt),
-                (YouTubeSearchTrendSource(seed=seed), w_yt),
-            ],
-            cache_ttl=int(os.environ.get("TREND_CACHE_TTL", "900")),
-            seed=seed,
-        )
-
-    if has_yt:
-        from modules.adapters.youtube_search import YouTubeSearchTrendSource
-        logger.info("TrendSource: YouTubeSearchTrendSource")
-        return YouTubeSearchTrendSource(seed=seed)
-
-    if has_gt:
-        from modules.adapters.google_trends import GoogleTrendsAdapter
-        geo = os.environ["GOOGLE_TRENDS_GEO"]
-        logger.info("TrendSource: GoogleTrendsAdapter (geo=%s)", geo)
-        return GoogleTrendsAdapter(geo=geo, seed=seed)
-
-    from modules.adapters.synthetic import SyntheticTrendSource
-    logger.info("TrendSource: SyntheticTrendSource (no API keys configured)")
-    return SyntheticTrendSource(seed=seed)
+    return _build(config)
 
 
-def build_llm_adapter(seed: int = 42) -> Optional[LLMAdapter]:
-    """Auto-select LLM adapter from environment variables.
+def build_storage(config: dict[str, Any]) -> StorageAdapter:
+    """Build the best available persistent storage adapter.
 
-    Selection priority:
-      1. GROQ_API_KEY + OLLAMA_URL → LLMFallbackChain([Groq, Ollama])
-      2. GROQ_API_KEY only         → GroqAdapter
-      3. OLLAMA_URL only           → OllamaAdapter
-      4. Neither                   → None (script generation stage skipped)
+    Currently only SQLite is implemented.
 
     Parameters
     ----------
-    seed:
-        Unused — reserved for future deterministic sampling.
+    config:
+        Application configuration dictionary.
+
+    Returns
+    -------
+    StorageAdapter
+        Configured storage adapter.
+
+    Examples
+    --------
+    >>> store = build_storage({})
+    >>> isinstance(store, StorageAdapter)
+    True
+    """
+    from modules.adapters.storage.sqlite import SQLiteStorage
+
+    db_path = config.get("DB_PATH")
+    return SQLiteStorage(db_path=Path(db_path) if db_path else None)
+
+
+def build_youtube_uploader(config: dict[str, Any]) -> PublisherAdapter:
+    """Build the YouTube publisher adapter.
+
+    Delegates to ``modules.adapters.publisher.build_youtube_uploader`` which
+    requires OAuth2 credentials.
+
+    Parameters
+    ----------
+    config:
+        Application configuration dictionary.
+
+    Returns
+    -------
+    PublisherAdapter
+        Configured YouTube publisher adapter.
+
+    Examples
+    --------
+    >>> publisher = build_youtube_uploader({})
+    >>> isinstance(publisher, PublisherAdapter)
+    True
+    """
+    from modules.adapters.publisher import build_youtube_uploader as _build
+
+    return _build(config)
+
+
+def build_manual_reviewer(config: dict[str, Any]) -> PublisherAdapter:
+    """Builds a "manual review" publisher that just saves artefacts.
+
+    This can be used in dry-run mode or when human oversight is required
+    before publishing.
+
+    Parameters
+    ----------
+    config:
+        Application configuration dictionary.
+
+    Returns
+    -------
+    PublisherAdapter
+        Configured manual reviewer adapter.
+
+    Examples
+    --------
+    >>> reviewer = build_manual_reviewer({})
+    >>> isinstance(reviewer, PublisherAdapter)
+    True
+    """
+    from modules.adapters.publisher import build_manual_reviewer as _build
+
+    return _build(config)
+
+
+def build_metrics_collector(config: dict[str, Any]) -> MetricsRegistry:
+    """Build metrics collector.
+
+    Parameters
+    ----------
+    config:
+        Application configuration dictionary.
+
+    Returns
+    -------
+    MetricsRegistry
+        Configured metrics registry.
+
+    Examples
+    --------
+    >>> metrics = build_metrics_collector({})
+    >>> isinstance(metrics, MetricsRegistry)
+    True
+    """
+    return MetricsRegistry()
+
+
+def build_llm_adapter() -> Optional[LLMAdapter]:
+    """Build the best available free-tier LLM adapter.
+
+    Delegates selection to ``modules.adapters.llm.build_llm_adapter`` which
+    prefers ``GroqAdapter`` and degrades to ``OllamaAdapter`` (if available).
 
     Returns
     -------
     LLMAdapter | None
-        Configured adapter, or None if no LLM keys present.
-
-    Complexity
-    ----------
-    O(1)
+        Configured adapter, or None if no LLM backend is available.
 
     Examples
     --------
-    >>> import os; os.environ.pop("GROQ_API_KEY", None); os.environ.pop("OLLAMA_URL", None)
-    >>> build_llm_adapter() is None
+    >>> adapter = build_llm_adapter()
+    >>> adapter is None or hasattr(adapter, 'generate')
     True
     """
     try:
@@ -219,815 +242,497 @@ def build_tts_adapter() -> Optional[TTSAdapter]:
     return adapter
 
 
-def build_youtube_uploader() -> Optional[PublisherAdapter]:
-    """Build YouTubeUploadAdapter when client_secret.json is configured.
+class YTAIMBotOrchestrator(object):
+    """The main YTAIMBot pipeline orchestrator.
 
-    Selection logic:
-      YOUTUBE_CLIENT_SECRET_PATH exists → YouTubeUploadAdapter (dry_run from env)
-      Not configured                    → None (publish stage skipped)
-
-    Returns
-    -------
-    PublisherAdapter | None
-        Configured adapter, or None if OAuth2 credentials not present.
-
-    Complexity
-    ----------
-    O(1)
-
-    Examples
-    --------
-    >>> import os; os.environ.pop("YOUTUBE_CLIENT_SECRET_PATH", None)
-    >>> build_youtube_uploader() is None
-    True
-    """
-    secret_path = os.environ.get("YOUTUBE_CLIENT_SECRET_PATH", "data/client_secret.json")
-    from pathlib import Path as _Path
-    if _Path(secret_path).exists():
-        from modules.adapters.publisher.youtube_upload import YouTubeUploadAdapter
-        logger.info("Publisher: YouTubeUploadAdapter (secret=%s)", secret_path)
-        return YouTubeUploadAdapter(client_secret_path=secret_path)
-    logger.info("Publisher: no client_secret.json — upload stage disabled")
-    return None
-
-
-def build_manual_reviewer() -> Optional["ManualReviewCLI"]:
-    """Build ManualReviewCLI from env if enabled.
-
-    Reads:
-      - MANUAL_REVIEW_ENABLED (default false)
-      - MANUAL_REVIEW_QUOTA (default 50)
-      - MANUAL_REVIEW_LOG_PATH (default data/audit/review_log.jsonl)
-    """
-    enabled = os.environ.get("MANUAL_REVIEW_ENABLED", "false").lower() == "true"
-    if not enabled:
-        return None
-    from modules.dashboard.audit_log import AuditLog
-    from modules.dashboard.manual_review import ManualReviewCLI
-
-    quota = int(os.environ.get("MANUAL_REVIEW_QUOTA", "50"))
-    path = os.environ.get("MANUAL_REVIEW_LOG_PATH", "data/audit/review_log.jsonl")
-    logger.info("ManualReview: enabled quota=%d log=%s", quota, path)
-    return ManualReviewCLI(audit_log=AuditLog(path=path), manual_quota=quota)
-
-
-def build_storage() -> StorageAdapter:
-    """Auto-select storage adapter based on environment variables.
-
-    Selection logic (T-321):
-    - STORAGE_BACKEND=sqlite → SQLiteStorage
-    - Default → InMemoryStorage (non-persistent)
-
-    Returns
-    -------
-    StorageAdapter
-        Persistent or ephemeral storage backend.
-    """
-    backend = os.environ.get("STORAGE_BACKEND", "in_memory").lower()
-    if backend == "sqlite":
-        from modules.adapters.storage.sqlite import SQLiteStorage  # noqa: PLC0415
-        return SQLiteStorage()
-    
-    from modules.adapters.storage.in_memory import InMemoryStorage  # noqa: PLC0415
-    return InMemoryStorage()
-
-
-def build_metrics_collector(storage: StorageAdapter) -> Any:
-    """Build MetricsCollector from env if enabled. (T-327)."""
-    if os.environ.get("STORAGE_BACKEND") == "in_memory":
-        from modules.adapters.synthetic import SyntheticMetricsCollector
-        return SyntheticMetricsCollector(storage) # type: ignore
-        
-    from modules.metrics_collector import MetricsCollector
-    return MetricsCollector(storage=storage)
-
-
-# ---------------------------------------------------------------------------
-# Pipeline
-# ---------------------------------------------------------------------------
-
-
-class Pipeline:
-    """Orchestrates the full trend-to-publish pipeline (9 stages).
+    Coordinates all steps of the content generation pipeline:
+    1. Trend signal ingestion
+    2. Trend analysis (ranking)
+    3. Script generation
+    4. Content quality & compliance checks
+    5. Video assembly
+    6. Publishing
 
     Parameters
     ----------
     trend_source:
-        Adapter that provides TrendSignal objects.
-    storage:
-        Adapter that persists run artefacts.
+        Adapter for ingesting raw trend signals.
+    script_generator:
+        Generates video scripts from content plans.
+    video_assembler:
+        Assembles video assets (video file, thumbnail, subtitles).
     publisher:
-        Optional adapter for publishing approved content.
-    llm:
-        Optional LLM adapter for script generation (Phase 2).
-        When None, stage 7 is skipped.
-    tts:
-        Optional TTS adapter for audio synthesis (Phase 2).
-        When None, stage 8 is skipped.
-    dry_run:
-        When ``True`` (default), no actual publishing occurs.
-    seed:
-        Integer seed for ML components. Defaults to 42.
-    audio_dir:
-        Directory for synthesized MP3 files. Defaults to ``data/audio``.
-    """
+        Publishes final video assets to the target platform (e.g., YouTube).
+    storage:
+        Persistent storage adapter for pipeline artifacts.
+    compliance_checker:
+        Performs content quality and compliance checks.
+    config:
+        Application configuration dictionary (e.g., environment variables).
+    rng:
+        Numpy random number generator for deterministic behavior.
 
-    _TOP_N = 5
+    Examples
+    --------
+    >>> from modules.adapters.synthetic import SyntheticTrendSource
+    >>> from modules.adapters.storage.sqlite import SQLiteStorage
+    >>> from modules.adapters.publisher.manual import ManualReviewPublisher
+    >>> from ytaimbot_ml.quality import MockComplianceChecker
+    >>> from ytaimbot_ml.schemas import Script, VideoAsset, ContentPlan
+    >>> from ytaimbot_ml.rl import MockRewardShaper, MockPolicy
+    >>> import numpy as np
+    >>> # Minimal setup for demonstration
+    >>> class MockScriptGenerator:
+    ...     def generate_script(self, plan: ContentPlan) -> Script:
+    ...         return Script(plan_id=plan.trend_id, sections=[])
+    >>> class MockVideoAssembler:
+    ...     def assemble_video(self, script: Script) -> VideoAsset:
+    ...         return VideoAsset(plan_id=script.plan_id)
+    >>> config = {"DRY_RUN": "1", "YTAIMBOT_DRY_RUN": "1"}
+    >>> storage = SQLiteStorage(db_path=":memory:")
+    >>> orchestrator = YTAIMBotOrchestrator(
+    ...     trend_source=SyntheticTrendSource(),
+    ...     script_generator=MockScriptGenerator(),
+    ...     video_assembler=MockVideoAssembler(),
+    ...     publisher=ManualReviewPublisher(storage=storage, config=config),
+    ...     storage=storage,
+    ...     compliance_checker=MockComplianceChecker(),
+    ...     config=config,
+    ...     rng=np.random.default_rng(42)
+    ... )
+    >>> run_id = str(uuid4())
+    >>> orchestrator.run_pipeline(run_id=run_id)
+    >>> orchestrator.storage.load_run(run_id)["status"]
+    'ok'
+    """
 
     def __init__(
         self,
         trend_source: TrendSourceAdapter,
+        script_generator: Any,  # ScriptGeneratorAdapter
+        video_assembler: Any,  # VideoAssemblerAdapter
+        publisher: PublisherAdapter,
         storage: StorageAdapter,
-        publisher: Optional[PublisherAdapter] = None,
-        manual_reviewer: Optional["ManualReviewCLI"] = None,
-        scheduler: Optional["UploadScheduler"] = None,
-        llm: Optional[LLMAdapter] = None,
-        tts: Optional[TTSAdapter] = None,
-        dry_run: bool = True,
-        seed: int = 42,
-        audio_dir: str | Path = "data/audio",
+        compliance_checker: Any,  # ComplianceCheckerAdapter
+        config: dict[str, Any],
+        rng: np.random.Generator,
     ) -> None:
-        self._source = trend_source
-        self._storage = storage
-        self._publisher = publisher
-        self._manual_reviewer = manual_reviewer
-        self._scheduler = scheduler
-        self._llm = llm
-        self._tts = tts
-        self._dry_run = dry_run
-        self._seed = seed
-        self._rng = make_rng(seed)
-        self._analyzer = TrendAnalyzer(rng=make_rng(seed))
-        self._gate = BayesQualityFilter()
-        self._similarity_gate = SimilarityGate()
-        self._reward_shaper = RewardShaper()
-        self._audio_dir = Path(audio_dir)
+        self.trend_source = trend_source
+        self.script_generator = script_generator
+        self.video_assembler = video_assembler
+        self.publisher = publisher
+        self.storage = storage
+        self.compliance_checker = compliance_checker
+        self.config = config
+        self.rng = rng
 
-        # RL Niche Selection (T-387+)
-        self._bandit: UCB1Bandit = self._init_bandit()
-        
-        # RL Drift Detection (T-431)
-        self._drift_detector = KSDriftDetector(
-            threshold=float(os.environ.get("DRIFT_THRESHOLD", "0.05"))
+        self.trend_analyzer = TrendAnalyzer(rng=rng)
+        self.quality_filter = BayesQualityFilter()
+        self.similarity_gate = SimilarityGate()
+        self.reward_shaper = RewardShaper()
+
+        # UCB1 Bandit for niche selection (explore/exploit)
+        self.niche_bandit = UCB1Bandit(
+            arm_ids=self.storage.load_niche_arms(), # Fixed parameter name
+            rng=rng,
         )
-        
-        # RL Policy Optimizer (T-432)
-        self._ppo = self._init_ppo()
-        
-        # Monitoring (Phase 7)
-        if os.environ.get("METRICS_ENABLED", "false").lower() == "true":
-            MetricsRegistry.start_server(int(os.environ.get("METRICS_PORT", "9090")))
+        self.niche_weights = self.storage.load_niche_weights()
 
-    def _init_bandit(self) -> UCB1Bandit:
-        """Initialise or restore the niche selection bandit.
+        # PPO Reinforcement Learning for content optimization
+        self.ppo_policy = LinearPPO(
+            state_dim=10,  # Fixed parameter names, removed rng
+            action_dim=5,
+        )
+        self.ppo_transitions: list[Transition] = []  # state, action, reward, next_state
 
-        Complexity: O(k) where k = number of niches.
-        """
-        bandit = UCB1Bandit.for_niches(rng=make_rng(self._seed))
-        
-        # Restore state if storage supports it
-        if hasattr(self._storage, "load_niche_arms"):
-            arms_data = self._storage.load_niche_arms()
-            if arms_data:
-                # Reconstruct bandit from stored stats
-                # Note: UCB1Bandit.from_dict expects a specific format
-                serialised = {
-                    "total_pulls": sum(a["n_pulls"] for a in arms_data),
-                    "arms": [
-                        {
-                            "arm_id": a["arm_id"],
-                            "n_pulls": a["n_pulls"],
-                            "total_reward": a["total_reward"],
-                            "last_reward": a["last_reward"],
-                        }
-                        for a in arms_data
-                    ]
-                }
-                bandit = UCB1Bandit.from_dict(serialised, rng=make_rng(self._seed))
-                logger.info("Pipeline: restored bandit state with %d pulls", bandit.total_pulls)
-        
-        return bandit
+        self.drift_detector = KSDriftDetector()
+        self.metrics_registry = MetricsRegistry()
 
-    def _init_ppo(self) -> LinearPPO:
-        """Initialise or restore the content policy optimizer.
-
-        Complexity: O(state_dim * action_dim).
-        """
-        # State: [n_pulls, avg_reward, last_reward, total_pulls] for the niche
-        state_dim = 4
-        # Actions: [0: short, 1: medium, 2: long] video duration
-        action_dim = 3
-        
-        lr = float(os.environ.get("PPO_LR", "0.01"))
-        eps = float(os.environ.get("PPO_EPSILON", "0.2"))
-        
-        ppo = LinearPPO(state_dim=state_dim, action_dim=action_dim, lr=lr, eps=eps)
-        
-        policy_path = Path(os.getenv("YTAIMBOT_DATA_DIR", "./data")) / "models" / "ppo_policy.pkl"
-        if policy_path.exists():
-            try:
-                ppo.load_policy(policy_path)
-                logger.info("Pipeline: restored PPO policy from %s", policy_path)
-            except Exception as exc:
-                logger.warning("Pipeline: failed to load PPO policy: %s", exc)
-                
-        return ppo
-
-    def _feedback_loop(self) -> None:
-        """Collect metrics and update RL bandit, PPO, and drift detection.
-
-        Algorithm: 
-          1. list recent published videos
-          2. query YouTube Analytics via MetricsCollector
-          3. shape reward in [0, 1] via RewardShaper
-          4. update bandit state
-          5. update PPO transitions
-          6. persist to storage
-          7. check for data drift and reset bandit if needed
-
-        Complexity: O(n_videos × API_call)
-        """
-        if not self._storage or not hasattr(self._storage, "list_published_videos"):
-            return
-
-        # 1. Get videos
-        videos = self._storage.list_published_videos(limit=20)
-        if not videos:
-            return
-
-        # 2. Build metrics collector
-        collector = build_metrics_collector(self._storage)
-
-        # 3. Handle PPO updates
-        self._update_ppo(videos, collector)
-
-        # 4. Handle Bandit and Drift
-        self._update_bandit_and_drift(videos, collector)
-
-    def _update_ppo(self, videos: list[dict], collector: Any) -> None:
-        """Process pending PPO transitions.  O(n_transitions)."""
-        if not hasattr(self._storage, "load_ppo_transitions"):
-            return
-            
-        pending = self._storage.load_ppo_transitions()
-        if not pending:
-            return
-            
-        trajectory = []
-        for p in pending:
-            video_id = p["video_id"]
-            # Find video record to get published_at
-            v = next((v for v in videos if v["video_id"] == video_id), None)
-            if not v:
-                continue
-                
-            try:
-                pub_at = datetime.fromtimestamp(v["published_at"], tz=timezone.utc)
-                snapshot = collector.collect(video_id, pub_at)
-                
-                # Reward for PPO
-                reward = self._reward_shaper.shape(
-                    ctr=snapshot.ctr,
-                    retention_30s=snapshot.retention_30s,
-                    views=snapshot.views
+        # Load PPO transitions from storage if any
+        stored_transitions = self.storage.load_ppo_transitions()
+        if stored_transitions:
+            logger.info("Loaded %d PPO transitions from storage.", len(stored_transitions))
+            for t_data in stored_transitions:
+                state = np.array(json.loads(t_data["state_json"]))
+                action_idx = t_data["action_idx"] # Fixed: action is int index in LinearPPO
+                reward = 0.0 # Reward will be calculated when the actual video metrics are available
+                next_state = np.zeros(self.ppo_policy.state_dim) # Placeholder
+                self.ppo_transitions.append(
+                    Transition(
+                        state=state,
+                        action_idx=action_idx,
+                        reward=reward,
+                        next_state=next_state,
+                        prob=t_data["prob"]
+                    )
                 )
-                
-                # Create transition object
-                state = np.array(json.loads(p["state_json"]))
-                trajectory.append(Transition(
-                    state=state,
-                    action_idx=p["action_idx"],
-                    reward=reward,
-                    prob=p["prob"]
-                ))
-            except Exception:
-                continue
-                
-        if trajectory:
-            loss = self._ppo.update(trajectory)
-            # Save updated policy
-            policy_dir = Path(os.getenv("YTAIMBOT_DATA_DIR", "./data")) / "models"
-            policy_dir.mkdir(parents=True, exist_ok=True)
-            self._ppo.save_policy(policy_dir / "ppo_policy.pkl")
-            logger.info("Pipeline: PPO update successful (loss=%.4f)", loss)
-            
-        # Always clear transitions to prevent stale updates
-        self._storage.clear_ppo_transitions()
 
-    def _update_bandit_and_drift(self, videos: list[dict], collector: Any) -> None:
-        """Update niche bandit and check for data drift.  O(n_videos)."""
-        all_rewards = []
-        for v in videos:
-            try:
-                from modules.metrics_collector import TooEarlyError
-                pub_at = datetime.fromtimestamp(v["published_at"], tz=timezone.utc)
-                snapshot = collector.collect(v["video_id"], pub_at)
-                
-                reward = self._reward_shaper.shape(
-                    ctr=snapshot.ctr,
-                    retention_30s=snapshot.retention_30s,
-                    views=snapshot.views
-                )
-                all_rewards.append(reward)
-                
-                # Update bandit
-                arm_id = v.get("trend_id")
-                if arm_id in self._bandit.stats:
-                    self._bandit.update(arm_id, reward)
-                    if hasattr(self._storage, "upsert_niche_arm"):
-                        arm = self._bandit.stats[arm_id]
-                        self._storage.upsert_niche_arm(
-                            arm_id=arm_id,
-                            n_pulls=arm.n_pulls,
-                            total_reward=arm.total_reward,
-                            last_reward=arm.last_reward
-                        )
-            except Exception:
-                continue
+        logger.info("Orchestrator initialized in DRY_RUN mode: %s", self.dry_run)
 
-        # Drift check (T-431)
-        if len(all_rewards) >= 10:
-            # We need reference and current distributions.
-            # Reference = last 20-10, Current = last 10.
-            # Simplified for MVP using current batch
-            mid = len(all_rewards) // 2
-            ref = all_rewards[:mid]
-            curr = all_rewards[mid:]
-            
-            report = self._drift_detector.check(ref, curr)
-            if report.drift_detected:
-                logger.warning("Pipeline: drift detected! Resetting bandit.")
-                self._bandit.reset()
-                # Persist reset
-                for aid in self._bandit.stats:
-                    if hasattr(self._storage, "upsert_niche_arm"):
-                        arm = self._bandit.stats[aid]
-                        self._storage.upsert_niche_arm(aid, 0, 0.0, 0.0)
+    @property
+    def dry_run(self) -> bool:
+        """True if the pipeline is running in dry-run mode (no publishing)."""
+        return (
+            os.getenv("DRY_RUN", "0").lower() == "1"
+            or os.getenv("YTAIMBOT_DRY_RUN", "0").lower() == "1"
+        )
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
-    def run(self, run_id: str | None = None) -> PipelineResult:
-        """Execute all pipeline stages and return a PipelineResult.
+    def run_pipeline(self, run_id: str) -> PipelineResult:
+        """Execute one full iteration of the YTAIMBot content generation pipeline.
 
         Parameters
         ----------
         run_id:
-            Unique identifier for this run. Auto-generated if omitted.
+            Unique identifier for this pipeline run.
 
         Returns
-        -------
+-------
         PipelineResult
-            Contains rankings, plans, compliance reports, scripts, status.
-
-        Complexity
-        ----------
-        O(n_trends × tokens) — dominated by LLM calls when enabled
+            Aggregated results and status of the pipeline run.
         """
-        run_id = run_id or str(uuid.uuid4())
-        
-        # Stage -2: RL Feedback (T-387+)
-        # Collect metrics from YouTube and update bandit before new selection
-        self._feedback_loop()
+        logger.info("[%s] Pipeline run started.", run_id)
+        start_time = time.time()
+        self.storage.save_run(run_id, "in_progress")
 
-        # Stage -1: RL Niche Selection (Phase 6)
-        # Select target niche before ingestion
-        target_niche = self._bandit.select()
-        logger.info("Pipeline: RL selected niche '%s'", target_niche)
-
-        # Stage -0.5: RL Content Optimization (PPO) (T-432)
-        # 1. Get state for the niche
-        arm = self._bandit.stats.get(target_niche)
-        state_vec = np.array([
-            float(arm.n_pulls) if arm else 0.0,
-            float(arm.avg_reward) if arm else 0.0,
-            float(arm.last_reward) if arm else 0.0,
-            float(self._bandit.total_pulls)
-        ])
-        
-        # 2. Select action
-        action_idx, prob = self._ppo.select_action(state_vec)
-        durations = ["short", "medium", "long"]
-        logger.info("Pipeline: PPO selected duration '%s' (prob=%.2f)", durations[action_idx], prob)
-
-        logger.info(
-            "Pipeline run %s started (dry_run=%s, llm=%s, tts=%s)",
-            run_id,
-            self._dry_run,
-            self._llm.__class__.__name__ if self._llm else "disabled",
-            self._tts.__class__.__name__ if self._tts else "disabled",
-        )
-
-        result = PipelineResult(run_id=run_id)
+        result = PipelineResult(run_id=run_id, status="error")
 
         try:
-            # Stage 0: persistent status
-            self._storage.save_run(run_id, "pending")
+            # 1. Trend signal ingestion
+            trends = self.trend_source.fetch()
+            self.storage.save_trends(run_id, trends)
+            logger.info("[%s] Ingested %d trend signals.", run_id, len(trends))
 
-            # Stage 1: ingest (with RL filtering)
-            signals = self._ingest(target_niche=target_niche)
-            self._storage.save_trends(run_id, signals)
+            if not trends:
+                logger.warning("[%s] No trends found. Pipeline finished.", run_id)
+                result.status = "ok"
+                self.storage.save_run(run_id, "ok")
+                return result
 
-            # Stages 2–4: featurize → reduce → score
-            rankings = self._score(signals)
-            result.rankings = rankings
+            # 2. Trend analysis (ranking)
+            ranked_trends = self.trend_analyzer.rank_trends(trends)
+            result.rankings = ranked_trends
+            logger.info("[%s] Ranked %d trends.", run_id, len(ranked_trends))
 
-            # Stage 5: plan
-            plans = self._plan(rankings)
-            result.plans = plans
-
-            # Stage 6: gate (Similarity + Bayes)
-            # Stage 6.1: Similarity Gate (T-275)
-            archive = self._storage.load_archive() if hasattr(self._storage, "load_archive") else {}
-            similarity_reports = [self._similarity_gate.check(p.title, archive) for p in plans]
-            
-            # Stage 6.2: Bayes Quality Filter
-            reports = self._gate_all(plans)
-            
-            # Combine reports (fail-closed)
-            for r, s in zip(reports, similarity_reports):
-                if s.decision == "block":
-                    r.decision = "block"
-                    r.reasons.append(f"Similarity too high: {s.score:.2f}")
-
-            result.compliance_reports = reports
-            self._storage.save_compliance(run_id, reports)
-
-            # Stage 7: script generation (Phase 2 — optional)
-            approved_plans = [
-                p for p, r in zip(plans, reports) if r.decision == "pass"
-            ]
-            if self._llm is not None and approved_plans:
-                scripts = self._generate_scripts(approved_plans)
-                result.scripts = scripts
-            else:
-                if self._llm is None:
-                    logger.info("Stage 7 skipped: no LLM adapter configured")
-
-            # Stage 8: TTS audio synthesis (Phase 2 — optional)
-            if self._tts is not None and result.scripts:
-                self._synthesize_audio(result.scripts, run_id)
-            else:
-                if self._tts is None and result.scripts:
-                    logger.info("Stage 8 skipped: no TTS adapter configured")
-
-            # Stage 8.1: SEO optimization (Phase 3 — optional)
-            if result.plans:
-                self._optimize_seo(result.plans)
-
-            # Stage 8.2: Thumbnail generation (Phase 3 — optional)
-            if result.plans:
-                self._generate_thumbnails(result.plans, run_id)
-
-            # Stage 8.3: Subtitle generation (Phase 3 — optional)
-            if result.scripts:
-                self._generate_subtitles(result.scripts, run_id)
-
-            # Stage 8.4: Video assembly (Phase 3 — optional)
-            if result.scripts:
-                self._assemble_videos(result.scripts, run_id)
-
-            # Stage 9: publish (T-371)
-            if self._publisher and not self._dry_run:
-                self._publish_approved(
-                    plans, 
-                    reports, 
-                    run_id,
-                    ppo_state=state_vec,
-                    ppo_action=action_idx,
-                    ppo_prob=prob
-                )
-
-            result.status = "ok"
-            self._storage.save_run(run_id, "ok")
-            return result
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Pipeline failed: %s", exc)
-            result.status = "error"
-            self._storage.save_run(run_id, "error")
-            return result
-
-    # ------------------------------------------------------------------
-    # Private stage implementations
-    # ------------------------------------------------------------------
-
-    def _ingest(self, target_niche: str | None = None) -> list[TrendSignal]:
-        """Fetch signals from source, filtered by niche if provided."""
-        signals = self._source.fetch()
-        
-        # RL Filter: If a niche is selected, prioritise its keywords
-        if target_niche:
-            # Simple keyword matching for demo; in production, 
-            # the adapter would take the niche as a query parameter.
-            niche_signals = [s for s in signals if target_niche.lower() in s.keyword.lower()]
-            if niche_signals:
-                logger.debug("Stage 1 — RL filtering: found %d signals for niche %s", len(niche_signals), target_niche)
-                return niche_signals
-            
-        logger.debug("Stage 1 — ingested %d signals", len(signals))
-        return signals
-
-    def _score(self, signals: list[TrendSignal]) -> list[TrendRanking]:
-        rankings = self._analyzer.analyze(signals)
-        logger.debug("Stages 2–4 — scored %d trends", len(rankings))
-        return rankings
-
-    def _plan(self, rankings: list[TrendRanking]) -> list[ContentPlan]:
-        top = rankings[: self._TOP_N]
-        optimizer = _get_title_optimizer()
-        plans = []
-        for r in top:
-            keywords = [r.trend_id, "youtube", "2026"]
-            title = (
-                optimizer.optimize_from_plan(
-                    ContentPlan(r.trend_id, r.trend_id, [], keywords)
-                )
-                if optimizer
-                else f"Video about {r.trend_id}"
+            # Select top trend for content generation (e.g., highest ranked)
+            top_trend = ranked_trends[0]
+            logger.info(
+                "[%s] Selected top trend: %s (score: %.2f)",
+                run_id,
+                top_trend.keyword,
+                top_trend.score,
             )
-            plans.append(ContentPlan(
-                trend_id=r.trend_id,
-                title=title,
-                outline=["Introduction", "Main content", "Call to action"],
-                keywords=keywords,
-            ))
-        logger.debug("Stage 5 — generated %d content plans (seo=%s)", len(plans), optimizer is not None)
-        return plans
 
-    def _gate_all(self, plans: list[ContentPlan]) -> list[ComplianceReport]:
-        reports: list[ComplianceReport] = []
-        for plan in plans:
-            features = _plan_to_features(plan)
-            report = self._gate.decide(features)
-            reports.append(report)
-            logger.debug(
-                "Stage 6 — compliance %s → %s (p_bad=%.3f)",
-                plan.trend_id,
-                report.decision,
-                report.bayes_p_bad,
+            # 3. Content Plan Generation (simplified for now)
+            # In a real scenario, this would involve more LLM calls
+            content_plan = ContentPlan(
+                trend_id=top_trend.trend_id,
+                title=f"How to {top_trend.keyword}",
+                outline=[
+                    "Introduction",
+                    f"Why {top_trend.keyword} is important",
+                    "Step-by-step guide",
+                    "Conclusion",
+                ],
+                keywords=[top_trend.keyword, "tutorial", "guide"],
             )
-        return reports
+            result.plans.append(content_plan)
+            logger.info("[%s] Generated content plan for '%s'.", run_id, top_trend.keyword)
 
-    def _generate_scripts(self, approved_plans: list[ContentPlan]) -> list[Script]:
-        """Stage 7: Generate LLM scripts for each approved plan.
+            # Choose an action using the PPO policy
+            content_state = np.random.rand(self.ppo_policy.state_dim) # Fixed: state is np.ndarray
+            action_idx, prob = self.ppo_policy.select_action(content_state) # Fixed method call
+            logger.info("[%s] PPO Policy chose action %d with prob %.2f", run_id, action_idx, prob)
 
-        Complexity: O(n_plans × tokens) — network/inference bound
-        """
-        from ytaimbot_ml.content.script_generator import ScriptGenerator
-        from ytaimbot_ml.content.token_budget import TokenBudget
+            # Store the transition for later PPO update
+            self.storage.save_ppo_transition(
+                video_id=run_id, # Use run_id as a dummy video_id for now
+                state=content_state.tolist(),
+                action_idx=action_idx,
+                prob=prob
+            )
 
-        language = os.environ.get("SCRIPT_LANGUAGE", "uk")
-        total_tokens = int(os.environ.get("LLM_TOTAL_TOKENS", "2048"))
-        generator = ScriptGenerator(
-            llm=self._llm,  # type: ignore[arg-type]
-            budget=TokenBudget(total_tokens=total_tokens),
-            language=language,
-        )
-
-        scripts: list[Script] = []
-        for plan in approved_plans:
-            try:
-                script = generator.generate(plan, self._rng)
-                scripts.append(script)
+            # 4. Script Generation
+            if self.script_generator:
+                script = self.script_generator.generate_script(content_plan)
+                result.scripts.append(script)
                 logger.info(
-                    "Stage 7 — script generated: plan=%s words=%d",
-                    plan.trend_id,
+                    "[%s] Generated script with %d sections (total words: %d).",
+                    run_id,
+                    len(script.sections),
                     script.total_words,
                 )
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Stage 7 — script generation failed for %s: %s", plan.trend_id, exc)
+            else:
+                logger.warning("[%s] Script generator not available.", run_id)
+                script = Script(plan_id=content_plan.trend_id, sections=[]) # Placeholder
 
-        return scripts
+            # 5. Content Quality & Compliance Checks
+            compliance_report = self.compliance_checker.check(script)
+            self.storage.save_compliance(run_id, [compliance_report])
+            result.compliance_reports.append(compliance_report)
+            logger.info(
+                "[%s] Compliance check decision: %s (Bayes P(bad): %.2f)",
+                run_id,
+                compliance_report.decision,
+                compliance_report.bayes_p_bad,
+            )
 
-    def _synthesize_audio(self, scripts: list[Script], run_id: str) -> None:
-        """Stage 8: Convert scripts to MP3 audio via TTS adapter.
+            if compliance_report.decision != "pass":
+                logger.warning("[%s] Content failed compliance. Aborting pipeline.", run_id)
+                result.status = "blocked"
+                self.storage.save_run(run_id, "blocked")
+                return result
 
-        Audio files saved to: {audio_dir}/{run_id}/{plan_id}.mp3
+            # Optional: Simulate TTS if available
+            if self.config.get("ENABLE_TTS", "0").lower() == "1":
+                tts_adapter = build_tts_adapter()
+                if tts_adapter:
+                    audio_path = Path(f"/tmp/{run_id}.mp3")
+                    try:
+                        tts_adapter.speak(script.full_text, audio_path)
+                        logger.info("[%s] TTS generated audio: %s", run_id, audio_path)
+                    except Exception as e:
+                        logger.error("[%s] TTS failed: %s", run_id, e)
+                else:
+                    logger.warning("[%s] TTS adapter not available.", run_id)
 
-        Complexity: O(n_scripts × len(text)) — synthesis bound
-        """
-        self._audio_dir.mkdir(parents=True, exist_ok=True)
-        run_audio_dir = self._audio_dir / run_id
-        run_audio_dir.mkdir(parents=True, exist_ok=True)
 
-        for script in scripts:
-            output_path = run_audio_dir / f"{script.plan_id}.mp3"
-            try:
-                self._tts.speak(script.full_text, output_path)  # type: ignore[union-attr]
+            # 6. Video Assembly
+            video_asset = self.video_assembler.assemble_video(script)
+            result.videos.append(video_asset)
+            logger.info(
+                "[%s] Assembled video: %s (thumbnail: %s).",
+                run_id,
+                video_asset.video_path,
+                video_asset.thumbnail_path,
+            )
+
+            # 7. Publishing
+            if not self.dry_run:
+                upload_result = self.publisher.publish(content_plan, compliance_report)
+                result.uploads.append(upload_result)
+                if upload_result.success:
+                    self.storage.save_video(
+                        video_id=upload_result.video_id,
+                        trend_id=content_plan.trend_id,
+                        title=content_plan.title,
+                        privacy_status=upload_result.privacy_status,
+                    )
+                    logger.info(
+                        "[%s] Published video: %s (URL: %s)",
+                        run_id,
+                        upload_result.video_id,
+                        upload_result.url,
+                    )
+                    # For PPO, calculate immediate reward based on preliminary metrics
+                    reward = self.reward_shaper.shape(
+                        views=0, # Initial views are 0
+                        ctr=0.0,
+                        retention_30s=0.0
+                    )
+                    # Find the stored PPO transition and update its reward
+                    for t in self.ppo_transitions:
+                        # Assuming video_id is used to link transition to actual video
+                        if np.array_equal(t.state, content_state): # Fixed match
+                            t.reward = reward
+                            break
+                    # Train PPO policy periodically
+                    if len(self.ppo_transitions) >= 10: # Example batch size
+                        self.ppo_policy.update(self.ppo_transitions) # Fixed method call
+                        self.storage.clear_ppo_transitions()
+                        self.ppo_transitions.clear()
+
+
+                else:
+                    logger.error("[%s] Video publishing failed.", run_id)
+                    result.status = "error"
+                    self.storage.save_run(run_id, "error")
+                    return result
+            else:
                 logger.info(
-                    "Stage 8 — audio synthesized: %s → %s",
-                    script.plan_id,
-                    output_path,
+                    "[%s] Dry-run mode: skipping actual video publishing.", run_id
                 )
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Stage 8 — TTS failed for %s: %s", script.plan_id, exc)
+                self.storage.save_video(
+                    video_id=compliance_report.content_hash, # Use content_hash as dummy video_id for dry run
+                    trend_id=content_plan.trend_id,
+                    title=content_plan.title,
+                    privacy_status="unlisted",
+                )
 
-    def _optimize_seo(self, plans: list[ContentPlan]) -> None:
-        """Stage 8.1: Expand keywords and optimize titles.  O(n_plans × k)."""
-        from ytaimbot_ml.seo.keyword_expander import KeywordExpander  # noqa: PLC0415
-        from ytaimbot_ml.seo.title_generator import TitleGenerator  # noqa: PLC0415
 
-        expander = KeywordExpander()
-        title_gen = TitleGenerator()
+            result.status = "ok"
+            self.storage.save_run(run_id, "ok")
+            logger.info("[%s] Pipeline run finished successfully.", run_id)
 
-        for plan in plans:
+        except Exception as e:
+            logger.exception("[%s] Pipeline run failed due to exception.", run_id)
+            result.status = "error"
+            self.storage.save_run(run_id, "error")
+        finally:
+            end_time = time.time()
+            duration = end_time - start_time
+            logger.info("[%s] Pipeline run completed in %.2f seconds.", run_id, duration)
+            self.metrics_registry.record_run(result.status) # Fixed method call
+            self.metrics_registry.observe_duration(duration) # Fixed method call
+
+        return result
+
+    def update_metrics(self) -> None:
+        """Update metrics for published videos and use them for RL training.
+
+        This method is typically called by the scheduler.
+        """
+        logger.info("Updating metrics for published videos.")
+        published_videos = self.storage.list_published_videos()
+        for video_info in published_videos:
+            video_id = video_info["video_id"]
+            # In a real scenario, fetch actual metrics from YouTube API
+            # For now, simulate some metrics for demonstration
+            metrics = {
+                "views": self.rng.randint(100, 10000),
+                "ctr": self.rng.uniform(0.02, 0.15),
+                "retention_30s": self.rng.uniform(0.3, 0.9),
+                "rpm": self.rng.uniform(0.5, 5.0),
+                "watch_time_h": self.rng.uniform(10, 1000),
+            }
+            snapshot = MetricsSnapshot(
+                video_id=video_id,
+                views=metrics["views"],
+                ctr=metrics["ctr"],
+                retention_30s=metrics["retention_30s"],
+                rpm=metrics["rpm"],
+                watch_time_h=metrics["watch_time_h"],
+                collected_at=datetime.now(timezone.utc)
+            )
+            self.storage.save_metrics(snapshot)
+            logger.debug("Saved metrics for video %s: %s", video_id, snapshot)
+
+            # Update PPO policy with new rewards
+            transitions = self.storage.load_ppo_transitions()
+            for transition_data in transitions:
+                if transition_data["video_id"] == video_id:
+                    # Calculate reward based on new metrics
+                    reward = self.reward_shaper.shape(
+                        views=snapshot.views,
+                        ctr=snapshot.ctr,
+                        retention_30s=snapshot.retention_30s
+                    )
+                    state = np.array(json.loads(transition_data["state_json"]))
+                    action_idx = transition_data["action_idx"]
+                    next_state = np.zeros(self.ppo_policy.state_dim) # Placeholder
+
+                    self.ppo_transitions.append(
+                        Transition(
+                            state=state,
+                            action_idx=action_idx,
+                            reward=reward,
+                            next_state=next_state,
+                            prob=transition_data["prob"]
+                        )
+                    )
+            if len(self.ppo_transitions) >= 10: # Example batch size
+                self.ppo_policy.update(self.ppo_transitions)
+                self.storage.clear_ppo_transitions()
+                self.ppo_transitions.clear()
+
+        logger.info("Metrics update completed.")
+
+    def optimize_niche_weights(self) -> None:
+        """Optimize niche weights based on UCB1 bandit results.
+
+        This method is typically called by the scheduler.
+        """
+        logger.info("Optimizing niche weights using UCB1 bandit.")
+        # Fetch current arm ids from storage
+        arm_ids = self.storage.load_niche_arms()
+        self.niche_bandit = UCB1Bandit(arm_ids=arm_ids, rng=self.rng)
+
+        # Simulate a pull for each niche to update internal states and get new weights
+        for arm_id in arm_ids:
+            # This is a simplification; actual reward would come from video performance
+            simulated_reward = self.rng.uniform(0.0, 1.0)
+            self.niche_bandit.update(arm_id, simulated_reward) # Fixed method name
+
+        # Update niche weights based on bandit's estimated values
+        new_weights = {
+            arm_id: self.niche_bandit._arms[arm_id].avg_reward for arm_id in arm_ids
+        }
+        self.storage.save_niche_weights(new_weights)
+        logger.info("Niche weights optimized and saved: %s", new_weights)
+
+    def run_daily_maintenance(self) -> None:
+        """Perform daily maintenance tasks like data cleanup, log rotation etc."""
+        logger.info("Running daily maintenance tasks.")
+        # Example: Clean up old temporary files
+        temp_dir = Path("/tmp")
+        for f in temp_dir.glob("ytaimbot_*.mp4"):
             try:
-                # 1. Expand keywords
-                plan.keywords = expander.expand(plan.keywords)
-                # 2. Optimize title
-                variants = title_gen.generate_variants(plan)
-                plan.title = title_gen.select_best(variants, plan)
-                logger.debug("Stage 8.1 — SEO optimized: %s", plan.trend_id)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Stage 8.1 — SEO failed for %s: %s", plan.trend_id, exc)
+                os.remove(f)
+                logger.debug("Cleaned up old video file: %s", f)
+            except OSError as e:
+                logger.warning("Error cleaning up file %s: %s", f, e)
+        logger.info("Daily maintenance completed.")
 
-    def _generate_thumbnails(self, plans: list[ContentPlan], run_id: str) -> None:
-        """Stage 8.2: Generate YouTube thumbnails.  O(n_plans × pixels)."""
-        from modules.adapters.video.thumbnail import ThumbnailGenerator  # noqa: PLC0415
+class Pipeline:
+    """Entry point for the YTAIMBot pipeline, handling configuration and orchestration."""
+
+    def __init__(self) -> None:
+        self.config = self._load_config()
+        self.rng = make_rng(self.config.get("YTAIMBOT_SEED", 42))
+
+        self.storage = build_storage(self.config)
+        self.trend_source = build_trend_source(self.config)
+        self.script_generator = build_llm_adapter()
+        self.video_assembler = create_video_backend(self.config)
+        self.compliance_checker = self._build_compliance_checker()
         
-        generator = ThumbnailGenerator()
-        thumb_dir = Path("data/thumbnails") / run_id
-        thumb_dir.mkdir(parents=True, exist_ok=True)
-
-        for plan in plans:
-            output_path = thumb_dir / f"{plan.trend_id}.jpg"
-            try:
-                generator.generate(plan.title, str(output_path))
-                logger.info("Stage 8.2 — thumbnail generated: %s", output_path)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Stage 8.2 — thumbnail failed for %s: %s", plan.trend_id, exc)
-
-    def _generate_subtitles(self, scripts: list[Script], run_id: str) -> None:
-        """Stage 8.3: Generate SRT subtitles.  O(n_scripts × words)."""
-        from modules.adapters.video.subtitle import SubtitleGenerator  # noqa: PLC0415
-        
-        generator = SubtitleGenerator()
-        subtitle_dir = Path("data/subtitles") / run_id
-        subtitle_dir.mkdir(parents=True, exist_ok=True)
-
-        for script in scripts:
-            output_path = subtitle_dir / f"{script.plan_id}.srt"
-            try:
-                # Estimate duration: ~150 wpm
-                duration = script.total_words / 2.5
-                generator.generate(script.full_text, duration, str(output_path))
-                logger.info("Stage 8.3 — subtitles generated: %s", output_path)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Stage 8.3 — subtitles failed for %s: %s", script.plan_id, exc)
-
-    def _assemble_videos(self, scripts: list[Script], run_id: str) -> None:
-        """Stage 8.4 — Video assembly (T-433)."""
-        logger.info("Stage 8.4 — assembling %d videos", len(scripts))
-        
-        # Use GPU-gated factory
-        use_sora = os.environ.get("USE_OPEN_SORA", "false").lower() == "true"
-        assembler = create_video_backend(
-            use_open_sora=use_sora,
-            output_dir=os.getenv("YTAIMBOT_DATA_DIR", "data") + "/videos"
+        # Determine if we are in dry run mode
+        dry_run = (
+            os.getenv("DRY_RUN", "0").lower() == "1"
+            or os.getenv("YTAIMBOT_DRY_RUN", "0").lower() == "1"
         )
         
-        for s in scripts:
-            try:
-                # Find matching plan to get thumbnail
-                # (Simplified for MVP)
-                # assembler.assemble(...) would be called here
-                logger.info("Stage 8.4 — video assembly simulated for %s", s.plan_id)
-            except Exception as exc:
-                logger.error("Video assembly failed for %s: %s", s.plan_id, exc)
+        self.publisher = (
+            build_youtube_uploader(self.config)
+            if not dry_run
+            else build_manual_reviewer(self.config)
+        )
+        self.metrics_registry = build_metrics_collector(self.config)
 
-    def _publish_approved(
-        self,
-        plans: list[ContentPlan],
-        reports: list[ComplianceReport],
-        run_id: str,
-        ppo_state: np.ndarray | None = None,
-        ppo_action: int | None = None,
-        ppo_prob: float | None = None
-    ) -> None:
-        """Stage 9: Publish approved content with PPO tracking (T-371)."""
-        assert self._publisher is not None
-        
-        # Get upload count for manual review threshold (T-288)
-        upload_count = self._storage.get_upload_count() if hasattr(self._storage, "get_upload_count") else 0
+        self.orchestrator = YTAIMBotOrchestrator(
+            trend_source=self.trend_source,
+            script_generator=self.script_generator,
+            video_assembler=self.video_assembler,
+            publisher=self.publisher,
+            storage=self.storage,
+            compliance_checker=self.compliance_checker,
+            config=self.config,
+            rng=self.rng,
+        )
 
-        for plan, report in zip(plans, reports):
-            if report.decision == "pass":
-                # 1. Similarity check for manual review (T-287)
-                archive = self._storage.load_archive() if hasattr(self._storage, "load_archive") else {}
-                similarity = self._similarity_gate.check(plan.title, archive)
+    def _load_config(self) -> dict[str, Any]:
+        """Load configuration from environment variables."""
+        return {
+            "YTAIMBOT_DRY_RUN": os.getenv("YTAIMBOT_DRY_RUN", "0"),
+            "YTAIMBOT_SEED": int(os.getenv("YTAIMBOT_SEED", "42")),
+            "YOUTUBE_API_KEY": os.getenv("YOUTUBE_API_KEY"),
+            "GOOGLE_TRENDS_GEO": os.getenv("GOOGLE_TRENDS_GEO", "US"),
+            "DB_PATH": os.getenv("DB_PATH"),
+            "LLM_PROVIDER": os.getenv("LLM_PROVIDER"),
+            "GROQ_API_KEY": os.getenv("GROQ_API_KEY"),
+            "LLM_MODEL": os.getenv("LLM_MODEL"),
+            "TTS_LANGUAGE": os.getenv("TTS_LANGUAGE"),
+            "TTS_VOICE": os.getenv("TTS_VOICE"),
+            "ENABLE_TTS": os.getenv("ENABLE_TTS", "0"),
+        }
 
-                # 2. Manual Review (T-286, T-306)
-                if self._manual_reviewer is not None:
-                    decision = self._manual_reviewer.review(
-                        plan=plan,
-                        similarity=similarity,
-                        upload_count=upload_count,
-                        compliance_score=report.score,
-                    )
-                    if decision != "approve":
-                        logger.info("Stage 9 — manual review rejected %s", plan.trend_id)
-                        continue
+    def _build_compliance_checker(self) -> Any:
+        """Build the content compliance checker."""
+        return SimilarityGate()
 
-                # 3. Scheduling or direct publishing (T-307)
-                success = False
-                if self._scheduler is not None:
-                    from modules.scheduler import UploadJob
-                    # Schedule with 1 hour gap between videos (T-298)
-                    scheduled_at = time.time() + (3600 * (upload_count + 1))
-                    job = UploadJob(
-                        scheduled_at=scheduled_at,
-                        plan_id=plan.trend_id,
-                        video_path=f"data/videos/{run_id}/{plan.trend_id}.mp4",
-                        thumbnail_path=f"data/thumbnails/{run_id}/{plan.trend_id}.jpg",
-                        title=plan.title,
-                        tags=plan.keywords,
-                    )
-                    self._scheduler.schedule(job)
-                    logger.info("Stage 9 — scheduled %s at %s", plan.trend_id, scheduled_at)
-                    success = True
-                else:
-                    # Fallback to direct publishing
-                    success = self._publisher.publish(plan, report)
-                    logger.info("Stage 9 — published %s → %s", plan.trend_id, success)
-                
-                # 4. Save transition for PPO (T-432)
-                if success and ppo_state is not None and ppo_action is not None and hasattr(self._storage, "save_ppo_transition"):
-                    self._storage.save_ppo_transition(
-                        video_id=plan.trend_id,
-                        state=ppo_state.tolist(),
-                        action_idx=ppo_action,
-                        prob=ppo_prob
-                    )
-                
-                upload_count += 1
-            else:
-                logger.info("Stage 9 — skipped %s (compliance failed)", plan.trend_id)
+    def run(self) -> None:
+        """Run the main pipeline."""
+        run_id = str(uuid4())
+        self.orchestrator.run_pipeline(run_id)
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _plan_to_features(plan: ContentPlan) -> dict[str, float]:
-    """Convert a ContentPlan to feature dict for the Bayes gate.
-
-    All features normalised to [0, 1].
-    """
-    title_len = min(len(plan.title) / 100.0, 1.0)
-    n_keywords = min(len(plan.keywords) / 10.0, 1.0)
-    n_outline = min(len(plan.outline) / 10.0, 1.0)
-    return {
-        "title_length_norm": title_len,
-        "keyword_density": n_keywords,
-        "outline_depth": n_outline,
-    }
-
-
-def _get_title_optimizer():
-    """Lazy-load TitleOptimizer. Returns None if seo package unavailable."""
-    try:
-        from ytaimbot_ml.seo.title_optimizer import TitleOptimizer  # noqa: PLC0415
-        return TitleOptimizer(year=os.environ.get("VIDEO_YEAR", "2026"))
-    except ImportError:
-        return None
-
-
-# ---------------------------------------------------------------------------
-# Module entry-point
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    import sys
-
-    logging.basicConfig(level=logging.INFO)
-
-    from modules.adapters.synthetic import InMemoryStorage
-
-    seed = int(os.environ.get("YTAIMBOT_SEED", "42"))
-    dry_run = os.environ.get("YTAIMBOT_DRY_RUN", "true").lower() != "false"
-
-    source = build_trend_source(seed=seed)
-    llm = build_llm_adapter(seed=seed)
-    tts = build_tts_adapter()
-    storage = InMemoryStorage()
-    manual_reviewer = build_manual_reviewer()
-
-    pipeline = Pipeline(
-        trend_source=source,
-        storage=storage,
-        manual_reviewer=manual_reviewer,
-        llm=llm,
-        tts=tts,
-        dry_run=dry_run,
-        seed=seed,
-    )
-
-    result = pipeline.run(run_id="demo-run-001")
-    print(f"Status  : {result.status}")
-    print(f"Rankings: {len(result.rankings)}")
-    print(f"Plans   : {len(result.plans)}")
-    print(f"Reports : {len(result.compliance_reports)}")
-    print(f"Scripts : {len(result.scripts)}")
-    sys.exit(0 if result.status == "ok" else 1)
+from ytaimbot_ml.learner.optimizer import Transition # Fixed import to use learner version
