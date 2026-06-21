@@ -43,6 +43,14 @@ class ArmStats:
 class UCB1Bandit:
     """UCB1 bandit for optimal niche selection."""
 
+    DEFAULT_NICHE_ARMS: list[str] = [
+        "tech_tutorials",
+        "finance_tips",
+        "health_wellness",
+        "gaming",
+        "cooking",
+    ]
+
     def __init__(
         self,
         arm_ids: List[str],

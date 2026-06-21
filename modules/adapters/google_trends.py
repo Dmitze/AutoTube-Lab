@@ -19,7 +19,7 @@ from ytaimbot_ml.schemas import TrendSignal
 class GoogleTrendsAdapter(TrendSourceAdapter):
     """Fetches trending searches from Google Trends using the `trendspy` library.
 
-    This adapter uses `trendspy.get_trends()` to fetch trending searches and
+    This adapter uses `trendspy.Trends().get_trends()` to fetch trending searches and
     converts the resulting Pandas DataFrame into a list of `TrendSignal` objects.
     """
 
@@ -38,7 +38,7 @@ class GoogleTrendsAdapter(TrendSourceAdapter):
         self._geo = geo
         self._fallback_source = fallback_source
         self._seed = seed # Store seed if needed for internal components.
-        # trendspy.get_trends requires a query. Since the original intent was general trends,
+        # trendspy.Trends().get_trends requires a query. Since the original intent was general trends,
         # we'll use a broad query or rely on the library's default if it exists.
         # For now, a generic "trending searches" query will be used, though trendspy
         # focuses on specific queries. This might need further discussion.
@@ -49,12 +49,13 @@ class GoogleTrendsAdapter(TrendSourceAdapter):
     def _fetch_with_retries(self) -> list[TrendSignal]:
         """Internal method for fetching trends with retries, without fallback.
 
-        This method calls `trendspy.get_trends()` and parses the DataFrame result.
+        This method calls `trendspy.Trends().get_trends()` and parses the DataFrame result.
         """
-        # trendspy.get_trends requires a query, but the original GoogleTrendsAdapter
+        # trendspy.Trends().get_trends requires a query, but the original GoogleTrendsAdapter
         # was designed for general trending searches without a specific query.
         # We will use a general query.
-        df = trendspy.get_trends(query=self._query, geo=self._geo)
+        client = trendspy.Trends()
+        df = client.get_trends(query=self._query, geo=self._geo)
 
         signals: list[TrendSignal] = []
         # Iterate over DataFrame rows and convert to TrendSignal
@@ -94,7 +95,7 @@ class GoogleTrendsAdapter(TrendSourceAdapter):
     def fetch(self) -> list[TrendSignal]:
         """Return a list of TrendSignal objects.
 
-        Complexity: O(N) where N is the number of items returned by `trendspy.get_trends()`.
+        Complexity: O(N) where N is the number of items returned by `trendspy.Trends().get_trends()`.
         """
         try:
             return self._fetch_with_retries()

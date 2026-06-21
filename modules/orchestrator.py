@@ -11,6 +11,8 @@ from uuid import uuid4
 
 import numpy as np
 
+from ytaimbot_ml.learner.optimizer import Transition
+
 from modules.adapters.base import (
     ComplianceReport,
     ContentPlan,
@@ -55,54 +57,14 @@ logger = logging.getLogger(__name__)
 
 
 def build_trend_source(config: dict[str, Any]) -> TrendSourceAdapter:
-    """Build the best available trend source adapter.
-
-    Delegates selection to `modules.adapters.trend.build_trend_source`, which
-    orchestrates a chain of priority: `CompositeTrendSource` (YouTube + Google
-    Trends) -> `GoogleTrendsAdapter` -> `YouTubeSearchAdapter` -> `SyntheticTrendSource`.
-
-    Parameters
-    ----------
-    config:
-        Application configuration dictionary (e.g. from environment variables).
-
-    Returns
-    -------
-    TrendSourceAdapter
-        Configured trend source adapter.
-
-    Examples
-    --------
-    >>> source = build_trend_source({})
-    >>> isinstance(source, TrendSourceAdapter)
-    True
-    """
+    """Build the best available trend source adapter."""
     from modules.adapters.trend import build_trend_source as _build
 
     return _build(config)
 
 
 def build_storage(config: dict[str, Any]) -> StorageAdapter:
-    """Build the best available persistent storage adapter.
-
-    Currently only SQLite is implemented.
-
-    Parameters
-    ----------
-    config:
-        Application configuration dictionary.
-
-    Returns
-    -------
-    StorageAdapter
-        Configured storage adapter.
-
-    Examples
-    --------
-    >>> store = build_storage({})
-    >>> isinstance(store, StorageAdapter)
-    True
-    """
+    """Build the best available persistent storage adapter."""
     from modules.adapters.storage.sqlite import SQLiteStorage
 
     db_path = config.get("DB_PATH")
@@ -110,98 +72,26 @@ def build_storage(config: dict[str, Any]) -> StorageAdapter:
 
 
 def build_youtube_uploader(config: dict[str, Any]) -> PublisherAdapter:
-    """Build the YouTube publisher adapter.
-
-    Delegates to ``modules.adapters.publisher.build_youtube_uploader`` which
-    requires OAuth2 credentials.
-
-    Parameters
-    ----------
-    config:
-        Application configuration dictionary.
-
-    Returns
-    -------
-    PublisherAdapter
-        Configured YouTube publisher adapter.
-
-    Examples
-    --------
-    >>> publisher = build_youtube_uploader({})
-    >>> isinstance(publisher, PublisherAdapter)
-    True
-    """
+    """Build the YouTube publisher adapter."""
     from modules.adapters.publisher import build_youtube_uploader as _build
 
     return _build(config)
 
 
 def build_manual_reviewer(config: dict[str, Any]) -> PublisherAdapter:
-    """Builds a "manual review" publisher that just saves artefacts.
-
-    This can be used in dry-run mode or when human oversight is required
-    before publishing.
-
-    Parameters
-    ----------
-    config:
-        Application configuration dictionary.
-
-    Returns
-    -------
-    PublisherAdapter
-        Configured manual reviewer adapter.
-
-    Examples
-    --------
-    >>> reviewer = build_manual_reviewer({})
-    >>> isinstance(reviewer, PublisherAdapter)
-    True
-    """
+    """Builds a manual review publisher that just saves artefacts."""
     from modules.adapters.publisher import build_manual_reviewer as _build
 
     return _build(config)
 
 
 def build_metrics_collector(config: dict[str, Any]) -> MetricsRegistry:
-    """Build metrics collector.
-
-    Parameters
-    ----------
-    config:
-        Application configuration dictionary.
-
-    Returns
-    -------
-    MetricsRegistry
-        Configured metrics registry.
-
-    Examples
-    --------
-    >>> metrics = build_metrics_collector({})
-    >>> isinstance(metrics, MetricsRegistry)
-    True
-    """
+    """Build metrics collector."""
     return MetricsRegistry()
 
 
 def build_llm_adapter() -> Optional[LLMAdapter]:
-    """Build the best available free-tier LLM adapter.
-
-    Delegates selection to ``modules.adapters.llm.build_llm_adapter`` which
-    prefers ``GroqAdapter`` and degrades to ``OllamaAdapter`` (if available).
-
-    Returns
-    -------
-    LLMAdapter | None
-        Configured adapter, or None if no LLM backend is available.
-
-    Examples
-    --------
-    >>> adapter = build_llm_adapter()
-    >>> adapter is None or hasattr(adapter, 'generate')
-    True
-    """
+    """Build the best available free-tier LLM adapter."""
     try:
         from modules.adapters.llm import build_llm_adapter as _build
         return _build()
@@ -211,27 +101,7 @@ def build_llm_adapter() -> Optional[LLMAdapter]:
 
 
 def build_tts_adapter() -> Optional[TTSAdapter]:
-    """Build best available free-tier TTS adapter.
-
-    Delegates selection to ``modules.adapters.tts.build_tts_adapter`` which
-    prefers ``FreeTierTTSChain`` (auto-fallback on quota/service errors) and
-    degrades to ``EdgeTTSAdapter`` when chain construction is unavailable.
-
-    Returns
-    -------
-    TTSAdapter | None
-        Configured adapter, or None if no TTS backend is available.
-
-    Complexity
-    ----------
-    O(1)
-
-    Examples
-    --------
-    >>> adapter = build_tts_adapter()
-    >>> adapter is None or hasattr(adapter, 'speak')
-    True
-    """
+    """Build best available free-tier TTS adapter."""
     from modules.adapters.tts import build_tts_adapter as _build_tts
 
     adapter = _build_tts()
@@ -242,69 +112,59 @@ def build_tts_adapter() -> Optional[TTSAdapter]:
     return adapter
 
 
-class YTAIMBotOrchestrator(object):
-    """The main YTAIMBot pipeline orchestrator.
+# ---------------------------------------------------------------------------
+# ComplianceCheckerAdapter — wraps SimilarityGate for single-arg check(script)
+# ---------------------------------------------------------------------------
 
-    Coordinates all steps of the content generation pipeline:
-    1. Trend signal ingestion
-    2. Trend analysis (ranking)
-    3. Script generation
-    4. Content quality & compliance checks
-    5. Video assembly
-    6. Publishing
+class ComplianceCheckerAdapter:
+    """Adapter that wraps SimilarityGate to accept a single Script argument.
+
+    SimilarityGate.check(new_text, archive) requires two arguments.
+    This adapter fetches the archive from storage and exposes a single-arg
+    check(script) interface compatible with the pipeline's compliance step.
 
     Parameters
     ----------
-    trend_source:
-        Adapter for ingesting raw trend signals.
-    script_generator:
-        Generates video scripts from content plans.
-    video_assembler:
-        Assembles video assets (video file, thumbnail, subtitles).
-    publisher:
-        Publishes final video assets to the target platform (e.g., YouTube).
+    gate:
+        Underlying SimilarityGate instance.
     storage:
-        Persistent storage adapter for pipeline artifacts.
-    compliance_checker:
-        Performs content quality and compliance checks.
-    config:
-        Application configuration dictionary (e.g., environment variables).
-    rng:
-        Numpy random number generator for deterministic behavior.
-
-    Examples
-    --------
-    >>> from modules.adapters.synthetic import SyntheticTrendSource
-    >>> from modules.adapters.storage.sqlite import SQLiteStorage
-    >>> from modules.adapters.publisher.manual import ManualReviewPublisher
-    >>> from ytaimbot_ml.quality import MockComplianceChecker
-    >>> from ytaimbot_ml.schemas import Script, VideoAsset, ContentPlan
-    >>> from ytaimbot_ml.rl import MockRewardShaper, MockPolicy
-    >>> import numpy as np
-    >>> # Minimal setup for demonstration
-    >>> class MockScriptGenerator:
-    ...     def generate_script(self, plan: ContentPlan) -> Script:
-    ...         return Script(plan_id=plan.trend_id, sections=[])
-    >>> class MockVideoAssembler:
-    ...     def assemble_video(self, script: Script) -> VideoAsset:
-    ...         return VideoAsset(plan_id=script.plan_id)
-    >>> config = {"DRY_RUN": "1", "YTAIMBOT_DRY_RUN": "1"}
-    >>> storage = SQLiteStorage(db_path=":memory:")
-    >>> orchestrator = YTAIMBotOrchestrator(
-    ...     trend_source=SyntheticTrendSource(),
-    ...     script_generator=MockScriptGenerator(),
-    ...     video_assembler=MockVideoAssembler(),
-    ...     publisher=ManualReviewPublisher(storage=storage, config=config),
-    ...     storage=storage,
-    ...     compliance_checker=MockComplianceChecker(),
-    ...     config=config,
-    ...     rng=np.random.default_rng(42)
-    ... )
-    >>> run_id = str(uuid4())
-    >>> orchestrator.run_pipeline(run_id=run_id)
-    >>> orchestrator.storage.load_run(run_id)["status"]
-    'ok'
+        StorageAdapter used to load the archive of previously published scripts.
     """
+
+    def __init__(self, gate: SimilarityGate, storage: StorageAdapter) -> None:
+        self._gate = gate
+        self._storage = storage
+
+    def check(self, script: Script) -> ComplianceReport:
+        """Run similarity check against the stored archive.
+
+        Parameters
+        ----------
+        script:
+            The Script object to evaluate.
+
+        Returns
+        -------
+        ComplianceReport
+            Compliance decision with similarity score and content hash.
+        """
+        text = " ".join(
+            s["text"] if isinstance(s, dict) else getattr(s, "text", str(s))
+            for s in (script.sections or [])
+        )
+        archive = self._storage.load_archive()
+        report = self._gate.check(text, archive)
+        return ComplianceReport(
+            content_hash=report.content_hash,
+            similarity_score=report.score,
+            bayes_p_bad=report.score,  # proxy: high similarity = high p_bad
+            decision=report.decision,
+            reasons=report.matches,
+        )
+
+
+class YTAIMBotOrchestrator(object):
+    """The main YTAIMBot pipeline orchestrator."""
 
     def __init__(
         self,
@@ -332,18 +192,20 @@ class YTAIMBotOrchestrator(object):
         self.reward_shaper = RewardShaper()
 
         # UCB1 Bandit for niche selection (explore/exploit)
+        _raw_arms = self.storage.load_niche_arms()
+        _arm_ids = [a["arm_id"] for a in _raw_arms] if _raw_arms else UCB1Bandit.DEFAULT_NICHE_ARMS
         self.niche_bandit = UCB1Bandit(
-            arm_ids=self.storage.load_niche_arms(), # Fixed parameter name
+            arm_ids=_arm_ids,
             rng=rng,
         )
         self.niche_weights = self.storage.load_niche_weights()
 
         # PPO Reinforcement Learning for content optimization
         self.ppo_policy = LinearPPO(
-            state_dim=10,  # Fixed parameter names, removed rng
+            state_dim=10,
             action_dim=5,
         )
-        self.ppo_transitions: list[Transition] = []  # state, action, reward, next_state
+        self.ppo_transitions: list[Transition] = []
 
         self.drift_detector = KSDriftDetector()
         self.metrics_registry = MetricsRegistry()
@@ -354,9 +216,9 @@ class YTAIMBotOrchestrator(object):
             logger.info("Loaded %d PPO transitions from storage.", len(stored_transitions))
             for t_data in stored_transitions:
                 state = np.array(json.loads(t_data["state_json"]))
-                action_idx = t_data["action_idx"] # Fixed: action is int index in LinearPPO
-                reward = 0.0 # Reward will be calculated when the actual video metrics are available
-                next_state = np.zeros(self.ppo_policy.state_dim) # Placeholder
+                action_idx = t_data["action_idx"]
+                reward = 0.0
+                next_state = np.zeros(self.ppo_policy.state_dim)
                 self.ppo_transitions.append(
                     Transition(
                         state=state,
@@ -378,18 +240,7 @@ class YTAIMBotOrchestrator(object):
         )
 
     def run_pipeline(self, run_id: str) -> PipelineResult:
-        """Execute one full iteration of the YTAIMBot content generation pipeline.
-
-        Parameters
-        ----------
-        run_id:
-            Unique identifier for this pipeline run.
-
-        Returns
--------
-        PipelineResult
-            Aggregated results and status of the pipeline run.
-        """
+        """Execute one full iteration of the YTAIMBot content generation pipeline."""
         logger.info("[%s] Pipeline run started.", run_id)
         start_time = time.time()
         self.storage.save_run(run_id, "in_progress")
@@ -409,43 +260,46 @@ class YTAIMBotOrchestrator(object):
                 return result
 
             # 2. Trend analysis (ranking)
-            ranked_trends = self.trend_analyzer.rank_trends(trends)
+            ranked_trends = self.trend_analyzer.analyze(trends)
             result.rankings = ranked_trends
             logger.info("[%s] Ranked %d trends.", run_id, len(ranked_trends))
 
             # Select top trend for content generation (e.g., highest ranked)
-            top_trend = ranked_trends[0]
+            top_ranking = ranked_trends[0]
+            # Look up the original TrendSignal to get keyword
+            _trend_map = {t.trend_id: t for t in trends}
+            top_signal = _trend_map.get(top_ranking.trend_id)
+            top_keyword = top_signal.keyword if top_signal else top_ranking.trend_id
             logger.info(
                 "[%s] Selected top trend: %s (score: %.2f)",
                 run_id,
-                top_trend.keyword,
-                top_trend.score,
+                top_keyword,
+                top_ranking.score,
             )
 
-            # 3. Content Plan Generation (simplified for now)
-            # In a real scenario, this would involve more LLM calls
+            # 3. Content Plan Generation
             content_plan = ContentPlan(
-                trend_id=top_trend.trend_id,
-                title=f"How to {top_trend.keyword}",
+                trend_id=top_ranking.trend_id,
+                title=f"How to {top_keyword}",
                 outline=[
                     "Introduction",
-                    f"Why {top_trend.keyword} is important",
+                    f"Why {top_keyword} is important",
                     "Step-by-step guide",
                     "Conclusion",
                 ],
-                keywords=[top_trend.keyword, "tutorial", "guide"],
+                keywords=[top_keyword, "tutorial", "guide"],
             )
             result.plans.append(content_plan)
-            logger.info("[%s] Generated content plan for '%s'.", run_id, top_trend.keyword)
+            logger.info("[%s] Generated content plan for '%s'.", run_id, top_keyword)
 
             # Choose an action using the PPO policy
-            content_state = np.random.rand(self.ppo_policy.state_dim) # Fixed: state is np.ndarray
-            action_idx, prob = self.ppo_policy.select_action(content_state) # Fixed method call
+            content_state = np.random.rand(self.ppo_policy.state_dim)
+            action_idx, prob = self.ppo_policy.select_action(content_state)
             logger.info("[%s] PPO Policy chose action %d with prob %.2f", run_id, action_idx, prob)
 
             # Store the transition for later PPO update
             self.storage.save_ppo_transition(
-                video_id=run_id, # Use run_id as a dummy video_id for now
+                video_id=run_id,
                 state=content_state.tolist(),
                 action_idx=action_idx,
                 prob=prob
@@ -463,7 +317,7 @@ class YTAIMBotOrchestrator(object):
                 )
             else:
                 logger.warning("[%s] Script generator not available.", run_id)
-                script = Script(plan_id=content_plan.trend_id, sections=[]) # Placeholder
+                script = Script(plan_id=content_plan.trend_id, sections=[])
 
             # 5. Content Quality & Compliance Checks
             compliance_report = self.compliance_checker.check(script)
@@ -495,7 +349,6 @@ class YTAIMBotOrchestrator(object):
                 else:
                     logger.warning("[%s] TTS adapter not available.", run_id)
 
-
             # 6. Video Assembly
             video_asset = self.video_assembler.assemble_video(script)
             result.videos.append(video_asset)
@@ -523,24 +376,19 @@ class YTAIMBotOrchestrator(object):
                         upload_result.video_id,
                         upload_result.url,
                     )
-                    # For PPO, calculate immediate reward based on preliminary metrics
                     reward = self.reward_shaper.shape(
-                        views=0, # Initial views are 0
+                        views=0,
                         ctr=0.0,
                         retention_30s=0.0
                     )
-                    # Find the stored PPO transition and update its reward
                     for t in self.ppo_transitions:
-                        # Assuming video_id is used to link transition to actual video
-                        if np.array_equal(t.state, content_state): # Fixed match
+                        if np.array_equal(t.state, content_state):
                             t.reward = reward
                             break
-                    # Train PPO policy periodically
-                    if len(self.ppo_transitions) >= 10: # Example batch size
-                        self.ppo_policy.update(self.ppo_transitions) # Fixed method call
+                    if len(self.ppo_transitions) >= 10:
+                        self.ppo_policy.update(self.ppo_transitions)
                         self.storage.clear_ppo_transitions()
                         self.ppo_transitions.clear()
-
 
                 else:
                     logger.error("[%s] Video publishing failed.", run_id)
@@ -552,12 +400,11 @@ class YTAIMBotOrchestrator(object):
                     "[%s] Dry-run mode: skipping actual video publishing.", run_id
                 )
                 self.storage.save_video(
-                    video_id=compliance_report.content_hash, # Use content_hash as dummy video_id for dry run
+                    video_id=compliance_report.content_hash,
                     trend_id=content_plan.trend_id,
                     title=content_plan.title,
                     privacy_status="unlisted",
                 )
-
 
             result.status = "ok"
             self.storage.save_run(run_id, "ok")
@@ -571,22 +418,17 @@ class YTAIMBotOrchestrator(object):
             end_time = time.time()
             duration = end_time - start_time
             logger.info("[%s] Pipeline run completed in %.2f seconds.", run_id, duration)
-            self.metrics_registry.record_run(result.status) # Fixed method call
-            self.metrics_registry.observe_duration(duration) # Fixed method call
+            self.metrics_registry.record_run(result.status)
+            self.metrics_registry.observe_duration(duration)
 
         return result
 
     def update_metrics(self) -> None:
-        """Update metrics for published videos and use them for RL training.
-
-        This method is typically called by the scheduler.
-        """
+        """Update metrics for published videos and use them for RL training."""
         logger.info("Updating metrics for published videos.")
         published_videos = self.storage.list_published_videos()
         for video_info in published_videos:
             video_id = video_info["video_id"]
-            # In a real scenario, fetch actual metrics from YouTube API
-            # For now, simulate some metrics for demonstration
             metrics = {
                 "views": self.rng.randint(100, 10000),
                 "ctr": self.rng.uniform(0.02, 0.15),
@@ -606,11 +448,9 @@ class YTAIMBotOrchestrator(object):
             self.storage.save_metrics(snapshot)
             logger.debug("Saved metrics for video %s: %s", video_id, snapshot)
 
-            # Update PPO policy with new rewards
             transitions = self.storage.load_ppo_transitions()
             for transition_data in transitions:
                 if transition_data["video_id"] == video_id:
-                    # Calculate reward based on new metrics
                     reward = self.reward_shaper.shape(
                         views=snapshot.views,
                         ctr=snapshot.ctr,
@@ -618,7 +458,7 @@ class YTAIMBotOrchestrator(object):
                     )
                     state = np.array(json.loads(transition_data["state_json"]))
                     action_idx = transition_data["action_idx"]
-                    next_state = np.zeros(self.ppo_policy.state_dim) # Placeholder
+                    next_state = np.zeros(self.ppo_policy.state_dim)
 
                     self.ppo_transitions.append(
                         Transition(
@@ -629,7 +469,7 @@ class YTAIMBotOrchestrator(object):
                             prob=transition_data["prob"]
                         )
                     )
-            if len(self.ppo_transitions) >= 10: # Example batch size
+            if len(self.ppo_transitions) >= 10:
                 self.ppo_policy.update(self.ppo_transitions)
                 self.storage.clear_ppo_transitions()
                 self.ppo_transitions.clear()
@@ -637,22 +477,16 @@ class YTAIMBotOrchestrator(object):
         logger.info("Metrics update completed.")
 
     def optimize_niche_weights(self) -> None:
-        """Optimize niche weights based on UCB1 bandit results.
-
-        This method is typically called by the scheduler.
-        """
+        """Optimize niche weights based on UCB1 bandit results."""
         logger.info("Optimizing niche weights using UCB1 bandit.")
-        # Fetch current arm ids from storage
-        arm_ids = self.storage.load_niche_arms()
+        _raw_arms = self.storage.load_niche_arms()
+        arm_ids = [a["arm_id"] for a in _raw_arms] if _raw_arms else UCB1Bandit.DEFAULT_NICHE_ARMS
         self.niche_bandit = UCB1Bandit(arm_ids=arm_ids, rng=self.rng)
 
-        # Simulate a pull for each niche to update internal states and get new weights
         for arm_id in arm_ids:
-            # This is a simplification; actual reward would come from video performance
             simulated_reward = self.rng.uniform(0.0, 1.0)
-            self.niche_bandit.update(arm_id, simulated_reward) # Fixed method name
+            self.niche_bandit.update(arm_id, simulated_reward)
 
-        # Update niche weights based on bandit's estimated values
         new_weights = {
             arm_id: self.niche_bandit._arms[arm_id].avg_reward for arm_id in arm_ids
         }
@@ -662,7 +496,6 @@ class YTAIMBotOrchestrator(object):
     def run_daily_maintenance(self) -> None:
         """Perform daily maintenance tasks like data cleanup, log rotation etc."""
         logger.info("Running daily maintenance tasks.")
-        # Example: Clean up old temporary files
         temp_dir = Path("/tmp")
         for f in temp_dir.glob("ytaimbot_*.mp4"):
             try:
@@ -671,6 +504,7 @@ class YTAIMBotOrchestrator(object):
             except OSError as e:
                 logger.warning("Error cleaning up file %s: %s", f, e)
         logger.info("Daily maintenance completed.")
+
 
 class Pipeline:
     """Entry point for the YTAIMBot pipeline, handling configuration and orchestration."""
@@ -684,13 +518,13 @@ class Pipeline:
         self.script_generator = build_llm_adapter()
         self.video_assembler = create_video_backend(self.config)
         self.compliance_checker = self._build_compliance_checker()
-        
+
         # Determine if we are in dry run mode
         dry_run = (
             os.getenv("DRY_RUN", "0").lower() == "1"
             or os.getenv("YTAIMBOT_DRY_RUN", "0").lower() == "1"
         )
-        
+
         self.publisher = (
             build_youtube_uploader(self.config)
             if not dry_run
@@ -726,13 +560,11 @@ class Pipeline:
         }
 
     def _build_compliance_checker(self) -> Any:
-        """Build the content compliance checker."""
-        return SimilarityGate()
+        """Build the content compliance checker using ComplianceCheckerAdapter."""
+        gate = SimilarityGate()
+        return ComplianceCheckerAdapter(gate=gate, storage=self.storage)
 
     def run(self) -> None:
         """Run the main pipeline."""
         run_id = str(uuid4())
         self.orchestrator.run_pipeline(run_id)
-
-
-from ytaimbot_ml.learner.optimizer import Transition # Fixed import to use learner version
