@@ -687,30 +687,83 @@ class YTAIMBotOrchestrator(object):
         logger.info("Daily maintenance completed.")
 
 class Pipeline:
-    """Entry point for the YTAIMBot pipeline, handling configuration and orchestration."""
+    """Lightweight Pipeline wrapper for tests and direct usage.
 
-    def __init__(self) -> None:
+    Supports both:
+    - Direct instantiation with adapters (for tests): T-069, T-074
+    - Config-based instantiation (for production): reads env vars
+
+    Parameters
+    ----------
+    trend_source:
+        TrendSourceAdapter to use. If None, auto-built from env vars.
+    storage:
+        StorageAdapter to use. If None, auto-built (SQLite).
+    publisher:
+        PublisherAdapter to use. If None, auto-built.
+    dry_run:
+        If True, skip upload stages. Reads YTAIMBOT_DRY_RUN if not set.
+    seed:
+        RNG seed for determinism.
+
+    Complexity
+    ----------
+    run(): O(N log N) dominated by SVD + sort.
+
+    Examples
+    --------
+    >>> from modules.adapters.synthetic import SyntheticTrendSource, InMemoryStorage, StubPublisher
+    >>> pipeline = Pipeline(
+    ...     trend_source=SyntheticTrendSource(seed=42),
+    ...     storage=InMemoryStorage(),
+    ...     publisher=StubPublisher(),
+    ...     dry_run=True,
+    ...     seed=42,
+    ... )
+    >>> result = pipeline.run(run_id="test-001")
+    >>> result.status in ("ok", "blocked", "error")
+    True
+    """
+
+    _TOP_N: int = int(os.getenv("PIPELINE_TOP_N", "5"))
+
+    def __init__(
+        self,
+        trend_source: TrendSourceAdapter | None = None,
+        storage: StorageAdapter | None = None,
+        publisher: PublisherAdapter | None = None,
+        dry_run: bool | None = None,
+        seed: int = 42,
+    ) -> None:
         self.config = self._load_config()
-        self.rng = make_rng(self.config.get("YTAIMBOT_SEED", 42))
+        self.config["YTAIMBOT_SEED"] = seed
 
-        self.storage = build_storage(self.config)
-        self.trend_source = build_trend_source(self.config)
+        self._dry_run = (
+            dry_run
+            if dry_run is not None
+            else (
+                os.getenv("DRY_RUN", "0").lower() == "1"
+                or os.getenv("YTAIMBOT_DRY_RUN", "0").lower() == "1"
+            )
+        )
+        self.config["YTAIMBOT_DRY_RUN"] = "1" if self._dry_run else "0"
+
+        rng = make_rng(seed)
+
+        # Use injected adapters or build from config
+        self.storage = storage or build_storage(self.config)
+        self.trend_source = trend_source or build_trend_source(self.config)
         self.script_generator = build_llm_adapter()
         self.video_assembler = create_video_backend(self.config)
-        self.compliance_checker = self._build_compliance_checker()
-        
-        # Determine if we are in dry run mode
-        dry_run = (
-            os.getenv("DRY_RUN", "0").lower() == "1"
-            or os.getenv("YTAIMBOT_DRY_RUN", "0").lower() == "1"
-        )
-        
-        self.publisher = (
-            build_youtube_uploader(self.config)
-            if not dry_run
-            else build_manual_reviewer(self.config)
-        )
+        self.compliance_checker = SimilarityGate()
         self.metrics_registry = build_metrics_collector(self.config)
+
+        if publisher is not None:
+            self.publisher = publisher
+        elif self._dry_run:
+            self.publisher = build_manual_reviewer(self.config)
+        else:
+            self.publisher = build_youtube_uploader(self.config)
 
         self.orchestrator = YTAIMBotOrchestrator(
             trend_source=self.trend_source,
@@ -720,7 +773,7 @@ class Pipeline:
             storage=self.storage,
             compliance_checker=self.compliance_checker,
             config=self.config,
-            rng=self.rng,
+            rng=rng,
         )
 
     def _load_config(self) -> dict[str, Any]:
@@ -730,6 +783,8 @@ class Pipeline:
             "YTAIMBOT_SEED": int(os.getenv("YTAIMBOT_SEED", "42")),
             "YOUTUBE_API_KEY": os.getenv("YOUTUBE_API_KEY"),
             "GOOGLE_TRENDS_GEO": os.getenv("GOOGLE_TRENDS_GEO", "US"),
+            "TREND_CACHE_TTL": int(os.getenv("TREND_CACHE_TTL", "900")),
+            "ADAPTER_WEIGHTS": os.getenv("ADAPTER_WEIGHTS", "1.0,1.0"),
             "DB_PATH": os.getenv("DB_PATH"),
             "LLM_PROVIDER": os.getenv("LLM_PROVIDER"),
             "GROQ_API_KEY": os.getenv("GROQ_API_KEY"),
@@ -743,10 +798,36 @@ class Pipeline:
         """Build the content compliance checker."""
         return SimilarityGate()
 
-    def run(self) -> None:
-        """Run the main pipeline."""
-        run_id = str(uuid4())
-        self.orchestrator.run_pipeline(run_id)
+    def run(self, run_id: str | None = None) -> PipelineResult:
+        """Run the main pipeline.
+
+        Parameters
+        ----------
+        run_id:
+            Optional run identifier. Auto-generated if not provided.
+
+        Returns
+        -------
+        PipelineResult
+            Aggregated results and status of the pipeline run.
+        """
+        if run_id is None:
+            run_id = str(uuid4())
+        return self.orchestrator.run_pipeline(run_id)
+
+    @staticmethod
+    def _plan_to_features(plan: ContentPlan) -> Any:
+        """Convert a ContentPlan to a feature vector for the Bayes gate.
+
+        Used in tests (T-074, T-075).
+
+        Complexity: O(1)
+        """
+        import numpy as np  # noqa: PLC0415
+        title_len = len(plan.title) / 100.0
+        kw_density = len(plan.keywords) / 10.0
+        outline_len = len(plan.outline) / 10.0
+        return np.array([[title_len, kw_density, outline_len]])
 
 
 from ytaimbot_ml.learner.optimizer import Transition # Fixed import to use learner version

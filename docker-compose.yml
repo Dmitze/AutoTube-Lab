@@ -15,17 +15,33 @@ services:
       - YTAIMBOT_DRY_RUN=${YTAIMBOT_DRY_RUN:-true}
       - YTAIMBOT_SEED=${YTAIMBOT_SEED:-42}
       - YTAIMBOT_DATA_DIR=/app/data
-      # Phase 1: Trend adapters
+      # Phase 1: Trend adapters (T-070, T-071, T-072, T-073)
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
       - GOOGLE_TRENDS_GEO=${GOOGLE_TRENDS_GEO:-US}
       - ADAPTER_WEIGHTS=${ADAPTER_WEIGHTS:-1.0,1.0}
       - TREND_CACHE_TTL=${TREND_CACHE_TTL:-900}
-      # Phase 2: LLM
+      # Phase 2: LLM (T-073)
       - LLM_PROVIDER=${LLM_PROVIDER:-groq}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-llama-3.1-8b-instant}
-      - TTS_LANGUAGE=${TTS_LANGUAGE:-uk}
-      - TTS_VOICE=${TTS_VOICE:-uk-UA-OstapNeural}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-1.5-flash}
+      - SCRIPT_LANGUAGE=${SCRIPT_LANGUAGE:-en}
+      # Phase 2: TTS (T-073)
+      - TTS_LANGUAGE=${TTS_LANGUAGE:-en}
+      - TTS_VOICE=${TTS_VOICE:-en-US-GuyNeural}
+      - TTS_GENDER=${TTS_GENDER:-male}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      - TTSMAKER_API_TOKEN=${TTSMAKER_API_TOKEN:-}
+      # Phase 3: Stock footage (T-073)
+      - PEXELS_API_KEY=${PEXELS_API_KEY:-}
+      - PIXABAY_API_KEY=${PIXABAY_API_KEY:-}
+      # Phase 5: YouTube publishing
+      - YOUTUBE_CLIENT_SECRET_PATH=${YOUTUBE_CLIENT_SECRET_PATH:-data/client_secret.json}
+      - MAX_UPLOADS_PER_DAY=${MAX_UPLOADS_PER_DAY:-1}
+      # Monitoring
+      - PROMETHEUS_PORT=${PROMETHEUS_PORT:-8000}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
 
   # Optional: local Ollama (uncomment if using local LLM on VPS with 4GB+ RAM)
   # ollama:
