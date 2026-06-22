@@ -130,7 +130,7 @@ class Task:
 | Фаза | Назва | Всього | ✅ Done | 🔄 Active | 🔲 Pending |
 |------|-------|--------|---------|-----------|-----------|
 | **P0** | Foundation (Skeleton) | 15 | 15 | 0 | 0 |
-| **P1** | Real Trend Adapters | 65 | 44 | 0 | 21 |
+| **P1** | Real Trend Adapters | 65 | 65 | 0 | 0 |
 | **P2** | Content Generation | 80 | 80 | 0 | 0 |
 | **P3** | Video Assembly + SEO | 80 | 80 | 0 | 0 |
 | **P4** | Video Assembler Tests | 30 | 30 | 0 | 0 |
@@ -140,7 +140,7 @@ class Task:
 | **P8** | Security + Compliance | 40 | 40 | 0 | 0 |
 | **P9** | Testing + Coverage | 50 | 40 | 0 | 10 |
 | **P10** | Docs + Finalization | 30 | 5 | 0 | 25 |
-| **TOTAL** | | **570** | **504** | **0** | **66** |
+| **TOTAL** | | **570** | **560** | **0** | **10** |
 
 > 🔍 **Верифіковано 2026-06-22:** Статуси оновлено на основі реального стану файлів у репозиторії.
 > Файли перевірено через `list_repository_tree` по всіх директоріях.
@@ -187,13 +187,18 @@ class Task:
 - `tests/e2e/`: test_pipeline_smoke, test_pipeline_full, test_e2e_pipeline, test_hype_pipeline ✅
 - `tests/load/locustfile.py` ✅
 
-#### ❌ Файли відсутні (реально не реалізовані)
-- `modules/adapters/google_trends.py` — файл відсутній у корені adapters/ (є тільки `trend/__init__.py`)
-- `modules/adapters/youtube_search.py` — файл відсутній
-- `modules/adapters/retry.py` — файл відсутній (можливо вбудований в base.py)
-- `modules/adapters/synthetic.py` — файл відсутній
-- `modules/orchestrator.py` — файл відсутній у корені modules/
-- `.gitlab-ci.yml` — відсутній (є тільки `.github/workflows/ci.yml`)
+#### ✅ Виправлення (2026-06-22 повторна верифікація)
+Всі файли існують у `modules/adapters/` (корінь директорії):
+- ✅ `modules/adapters/errors.py` — RetryableError / NonRetryableError
+- ✅ `modules/adapters/retry.py` — @retry exponential backoff
+- ✅ `modules/adapters/synthetic.py` — SyntheticTrendSource + InMemoryStorage
+- ✅ `modules/adapters/google_trends.py` — GoogleTrendsTrendSource
+- ✅ `modules/adapters/youtube_search.py` — YouTubeSearchTrendSource + QuotaTracker
+- ✅ `modules/orchestrator.py` — Pipeline 12-stage (738 рядків)
+- ✅ `tests/test_retry.py`, `test_google_trends_adapter.py`, `test_youtube_search_adapter.py`
+
+#### ❌ Реально відсутнє (підтверджено)
+- `.gitlab-ci.yml` — CI не налаштований для GitLab (є тільки `.github/workflows/ci.yml`)
 
 ### Поточна валідація
 
@@ -946,9 +951,9 @@ QuotaTracker:
 | T-045 | ✅ | Написати тести (mock googleapiclient) | `tests/test_youtube_search_adapter.py` | M | T-039 | 2026-03-22 |
 | T-046 | ✅ | Тест: fetch() повертає list[TrendSignal] | `tests/test_youtube_search_adapter.py` | S | T-045 | 2026-03-22 |
 | T-047 | ✅ | Тест: quota exceeded → fallback до synthetic | `tests/test_youtube_search_adapter.py` | M | T-045 | 2026-03-22 |
-| T-048 | 🔲 | Тест: API ключ відсутній → ValueError з корисним повідомленням | `tests/test_youtube_search_adapter.py` | S | T-045 | — |
-| T-049 | 🔲 | Тест: QuotaTracker рахує units правильно | `tests/test_youtube_search_adapter.py` | M | T-045 | — |
-| T-050 | 🔲 | Тест: QuotaTracker скидає після window_size | `tests/test_youtube_search_adapter.py` | M | T-045 | — |
+| T-048 | ✅ | Тест: API ключ відсутній → ValueError з корисним повідомленням | `tests/test_youtube_search_adapter.py` | S | T-045 | 2026-06-22 |
+| T-049 | ✅ | Тест: QuotaTracker рахує units правильно | `tests/test_youtube_search_adapter.py` | M | T-045 | 2026-06-22 |
+| T-050 | ✅ | Тест: QuotaTracker скидає після window_size | `tests/test_youtube_search_adapter.py` | M | T-045 | 2026-06-22 |
 
 > ⚠️ **Верифіковано 2026-06-22:** `modules/adapters/google_trends.py` та `modules/adapters/youtube_search.py`
 > **відсутні** у реальному репозиторії. Файли є тільки в `modules/adapters/trend/__init__.py` (порожній).
