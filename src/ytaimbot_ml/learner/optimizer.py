@@ -29,10 +29,28 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Transition:
-    """A single RL transition (s, a, r, s_next)."""
+    """A single RL transition (s, a, r, s_next, prob).
+
+    Fields
+    ------
+    state:
+        Feature vector at time t.  Shape: (state_dim,).
+    action_idx:
+        Index of the action taken.
+    reward:
+        Observed scalar reward in [0, 1].
+    next_state:
+        Feature vector at time t+1.  Shape: (state_dim,).
+        Used for TD-error / advantage estimation.
+    prob:
+        Probability of *action_idx* under the **old** policy π_old(a|s).
+        Required for PPO importance-sampling ratio r_t = π_new / π_old.
+    """
+
     state: np.ndarray
     action_idx: int
     reward: float
+    next_state: np.ndarray
     prob: float  # probability of action under old policy
 
 
