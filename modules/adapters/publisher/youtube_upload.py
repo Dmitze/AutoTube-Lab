@@ -1,14 +1,14 @@
 """YouTubeUploadAdapter: uploads videos via YouTube Data API v3.
 
-Roadmap tasks: T-371 through T-400 (EPIC 4.1 Publishing Pipeline)
-Dependencies:  google-auth-oauthlib, google-api-python-client
+Roadmap tasks: T-241 through T-268 (EPIC 4.1–4.2 Publishing Pipeline)
+T-244 fix: publish() now returns UploadResult instead of bool.
 
 Environment variables:
   YOUTUBE_CLIENT_SECRET_PATH : path to client_secret.json (OAuth2)
   YOUTUBE_TOKEN_PATH         : path to token.json (cached credentials)
   YOUTUBE_CATEGORY_ID        : default category (default "28" = Science & Technology)
   YOUTUBE_DEFAULT_LANGUAGE   : default language tag (default "uk")
-  YTAIMBOT_DRY_RUN           : if "true", publish() raises DryRunError
+  YTAIMBOT_DRY_RUN           : if "true", publish() returns empty UploadResult
 
 Upload pipeline — Resumable Upload algorithm:
   1. QuotaGuard.allow()                    → O(1)
@@ -17,11 +17,6 @@ Upload pipeline — Resumable Upload algorithm:
   4. _upload_video(video_path, metadata)   → resumable, chunk_size=256 KB
   5. _set_thumbnail(video_id, thumbnail)   → thumbnail.set API call
   6. _schedule_public(video_id, delay_h)   → videos.update → publishAt
-
-Error handling:
-  - HttpError 403/quota_exceeded → QuotaExhaustedError (non-retryable)
-  - HttpError 5xx               → retried up to 3 times (exponential backoff)
-  - Missing google package       → ImportError with install instructions
 """
 from __future__ import annotations
 
@@ -47,7 +42,7 @@ _MAX_RETRIES = 3
 
 
 class DryRunError(RuntimeError):
-    """Raised when publish() is called in dry-run mode."""
+    """Raised when upload() is called in dry-run mode."""
 
 
 class YouTubeUploadAdapter(PublisherAdapter):
@@ -58,21 +53,20 @@ class YouTubeUploadAdapter(PublisherAdapter):
     quota_guard:
         Token Bucket guard.  Created automatically if not provided.
     client_secret_path:
-        Path to ``client_secret.json`` for OAuth2.  Defaults to
-        ``YOUTUBE_CLIENT_SECRET_PATH`` env var or ``data/client_secret.json``.
+        Path to ``client_secret.json`` for OAuth2.
     token_path:
-        Path to cached OAuth2 token.  Defaults to
-        ``YOUTUBE_TOKEN_PATH`` env var or ``data/token.json``.
+        Path to cached OAuth2 token.
     category_id:
         YouTube category ID string (default ``"28"`` = Science & Technology).
     language:
         Video default language tag (default ``"uk"``).
     dry_run:
-        When ``True``, publish() raises DryRunError without touching the API.
+        When ``True``, publish() returns empty UploadResult (no API calls).
 
     Complexity
     ----------
-    publish(): O(file_size / chunk_size) — network I/O bound
+    publish(): O(1) — plan-only interface, no video asset
+    upload():  O(file_size / chunk_size) — network I/O bound
 
     Examples
     --------
@@ -111,11 +105,16 @@ class YouTubeUploadAdapter(PublisherAdapter):
             self.dry_run = os.environ.get("YTAIMBOT_DRY_RUN", "true").lower() != "false"
 
     # ------------------------------------------------------------------
-    # PublisherAdapter ABC — legacy plan-only publish
+    # PublisherAdapter ABC — T-244 fix: returns UploadResult
     # ------------------------------------------------------------------
 
-    def publish(self, plan: ContentPlan, compliance_report: ComplianceReport) -> bool:
-        """Legacy interface: publish a content plan with no video asset.
+    def publish(
+        self, plan: ContentPlan, compliance_report: ComplianceReport
+    ) -> UploadResult:
+        """Implement PublisherAdapter ABC — returns UploadResult (T-244 fix).
+
+        Plan-only interface (no VideoAsset). Returns an UploadResult with
+        empty video_id (success=False). Use upload() for full video publishing.
 
         Parameters
         ----------
@@ -126,20 +125,24 @@ class YouTubeUploadAdapter(PublisherAdapter):
 
         Returns
         -------
-        bool
-            Always ``False`` (no video asset available via this interface).
-            Use ``upload()`` for full video publishing.
+        UploadResult
+            Empty result (video_id="") — success=False.
 
         Examples
         --------
         >>> adapter = YouTubeUploadAdapter(dry_run=True)
-        >>> adapter.publish(ContentPlan("t1","Title",[],[]), ComplianceReport("h",0.0,0.1,"pass",[]))
+        >>> result = adapter.publish(
+        ...     ContentPlan("t1", "Title", [], []),
+        ...     ComplianceReport("h", 0.0, 0.1, "pass", [])
+        ... )
+        >>> result.success
         False
         """
         logger.info(
-            "YouTubeUploadAdapter.publish() called via legacy interface — no video asset. Use upload()."
+            "YouTubeUploadAdapter.publish() called via plan-only interface "
+            "— no VideoAsset. Use upload() for real publishing."
         )
-        return False
+        return UploadResult(plan_id=plan.trend_id)
 
     # ------------------------------------------------------------------
     # Primary upload API
@@ -191,14 +194,6 @@ class YouTubeUploadAdapter(PublisherAdapter):
         Complexity
         ----------
         O(file_size / 262144) — one API call per 256 KB chunk
-
-        Examples
-        --------
-        >>> adapter = YouTubeUploadAdapter(dry_run=True)
-        >>> adapter.upload(VideoAsset("t1"), ContentPlan("t1","T",[],[]), ...)
-        Traceback (most recent call last):
-            ...
-        modules.adapters.publisher.youtube_upload.DryRunError: ...
         """
         if self.dry_run:
             raise DryRunError(
@@ -239,7 +234,10 @@ class YouTubeUploadAdapter(PublisherAdapter):
             self._schedule_public(youtube, video_id, delay_hours=publish_delay_hours)
 
         url = f"https://youtu.be/{video_id}"
-        logger.info("Upload complete: video_id=%s url=%s quota_used=%d", video_id, url, quota_used)
+        logger.info(
+            "Upload complete: video_id=%s url=%s quota_used=%d",
+            video_id, url, quota_used,
+        )
 
         return UploadResult(
             plan_id=plan.trend_id,
@@ -254,24 +252,7 @@ class YouTubeUploadAdapter(PublisherAdapter):
     # ------------------------------------------------------------------
 
     def _get_credentials(self):
-        """Load or refresh OAuth2 credentials.
-
-        Uses ``google-auth-oauthlib`` InstalledAppFlow for first-time auth,
-        then caches token to ``_token_path`` for subsequent runs.
-
-        Returns
-        -------
-        google.oauth2.credentials.Credentials
-
-        Raises
-        ------
-        ImportError
-            If ``google-auth-oauthlib`` is not installed.
-        FileNotFoundError
-            If ``_client_secret`` path does not exist.
-
-        Complexity: O(1) — single file read or HTTP refresh
-        """
+        """Load or refresh OAuth2 credentials.  Complexity: O(1)."""
         try:
             from google.auth.transport.requests import Request
             from google.oauth2.credentials import Credentials
@@ -308,19 +289,7 @@ class YouTubeUploadAdapter(PublisherAdapter):
         return creds
 
     def _build_service(self):
-        """Build the YouTube API service client.
-
-        Returns
-        -------
-        googleapiclient.discovery.Resource
-
-        Raises
-        ------
-        ImportError
-            If ``google-api-python-client`` is not installed.
-
-        Complexity: O(1)
-        """
+        """Build the YouTube API service client.  Complexity: O(1)."""
         try:
             from googleapiclient.discovery import build
         except ImportError as exc:
@@ -344,8 +313,6 @@ class YouTubeUploadAdapter(PublisherAdapter):
     ) -> str:
         """Execute resumable upload and return the YouTube video_id.
 
-        Retries up to ``_MAX_RETRIES`` times on 5xx errors (exponential backoff).
-
         Complexity: O(file_size / chunk_size)
         """
         try:
@@ -358,7 +325,7 @@ class YouTubeUploadAdapter(PublisherAdapter):
 
         body = {
             "snippet": {
-                "title": title[:100],  # YouTube title max 100 chars
+                "title": title[:100],
                 "description": description[:5000],
                 "tags": tags[:500],
                 "categoryId": category_id,
@@ -393,7 +360,10 @@ class YouTubeUploadAdapter(PublisherAdapter):
             except HttpError as e:
                 if e.resp.status in (500, 502, 503, 504) and retry < _MAX_RETRIES:
                     wait = 2 ** retry
-                    logger.warning("Upload HTTP %s — retry %d/%d in %ds", e.resp.status, retry + 1, _MAX_RETRIES, wait)
+                    logger.warning(
+                        "Upload HTTP %s — retry %d/%d in %ds",
+                        e.resp.status, retry + 1, _MAX_RETRIES, wait,
+                    )
                     time.sleep(wait)
                     retry += 1
                 else:
@@ -402,10 +372,7 @@ class YouTubeUploadAdapter(PublisherAdapter):
         return response["id"]
 
     def _set_thumbnail(self, youtube, video_id: str, thumbnail_path: Path) -> None:
-        """Set the custom thumbnail for an uploaded video.
-
-        Complexity: O(file_size) — single HTTP POST
-        """
+        """Set the custom thumbnail for an uploaded video.  Complexity: O(file_size)."""
         try:
             from googleapiclient.http import MediaFileUpload
         except ImportError as exc:
@@ -416,12 +383,7 @@ class YouTubeUploadAdapter(PublisherAdapter):
         logger.debug("Thumbnail set for video_id=%s", video_id)
 
     def _schedule_public(self, youtube, video_id: str, delay_hours: int = 24) -> None:
-        """Schedule a video to go public after ``delay_hours`` hours.
-
-        Sets ``status.publishAt`` to now + delay_hours (UTC).
-
-        Complexity: O(1) — single API call
-        """
+        """Schedule a video to go public after ``delay_hours`` hours.  Complexity: O(1)."""
         publish_at = (
             datetime.now(timezone.utc) + timedelta(hours=delay_hours)
         ).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -440,10 +402,7 @@ class YouTubeUploadAdapter(PublisherAdapter):
 
     @staticmethod
     def _auto_description(plan: ContentPlan) -> str:
-        """Generate a basic video description from a ContentPlan.
-
-        Complexity: O(k) where k = len(plan.keywords)
-        """
+        """Generate a basic video description from a ContentPlan.  Complexity: O(k)."""
         tags_line = " ".join(f"#{kw.replace(' ', '_')}" for kw in plan.keywords[:20])
         parts = [
             plan.title,
@@ -452,7 +411,7 @@ class YouTubeUploadAdapter(PublisherAdapter):
             "",
             tags_line,
             "",
-            "✅ Створено за допомогою YTAIMBot | Автоматично згенерований контент",
+            "AI-generated content. All characters are adults (18+). Fictional content only.",
+            "✅ Created with YTAIMBot | Auto-generated content",
         ]
         return "\n".join(parts)
-
