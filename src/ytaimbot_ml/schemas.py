@@ -407,5 +407,9 @@ class PipelineResult:
     # T-151: Phase 2 integration fields
     script_path: str | None = None   # path to generated .txt script file
     audio_path: str | None = None    # path to synthesized .mp3 audio file
+    # T-304: Phase 4 publishing fields
+    video_id: str | None = None          # YouTube video_id after upload
+    published_at: str | None = None      # ISO-8601 timestamp of publication
+    audit_entry: dict | None = None      # AuditLog entry for this run
 
 
