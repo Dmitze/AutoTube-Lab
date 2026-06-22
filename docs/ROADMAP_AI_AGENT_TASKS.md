@@ -130,17 +130,20 @@ class Task:
 | Фаза | Назва | Всього | ✅ Done | 🔄 Active | 🔲 Pending |
 |------|-------|--------|---------|-----------|-----------|
 | **P0** | Foundation (Skeleton) | 15 | 15 | 0 | 0 |
-| **P1** | Real Trend Adapters | 65 | 65 | 0 | 0 |
+| **P1** | Real Trend Adapters | 65 | 44 | 0 | 21 |
 | **P2** | Content Generation | 80 | 80 | 0 | 0 |
 | **P3** | Video Assembly + SEO | 80 | 80 | 0 | 0 |
 | **P4** | Video Assembler Tests | 30 | 30 | 0 | 0 |
-| **P5** | Free-Tier Cloud Stack | 70 | 60 | 0 | 10 |
-| **P6** | Metrics + RL Bandit | 60 | 0 | 0 | 60 |
-| **P7** | Infrastructure + DevOps | 50 | 0 | 0 | 50 |
-| **P8** | Security + Compliance | 40 | 0 | 0 | 40 |
-| **P9** | Testing + Coverage | 50 | 0 | 0 | 50 |
-| **P10** | Docs + Finalization | 30 | 0 | 0 | 30 |
-| **TOTAL** | | **570** | **330** | **0** | **240** |
+| **P5** | Free-Tier Cloud Stack | 70 | 65 | 0 | 5 |
+| **P6** | Metrics + RL Bandit | 60 | 60 | 0 | 0 |
+| **P7** | Infrastructure + DevOps | 50 | 45 | 0 | 5 |
+| **P8** | Security + Compliance | 40 | 40 | 0 | 0 |
+| **P9** | Testing + Coverage | 50 | 40 | 0 | 10 |
+| **P10** | Docs + Finalization | 30 | 5 | 0 | 25 |
+| **TOTAL** | | **570** | **504** | **0** | **66** |
+
+> 🔍 **Верифіковано 2026-06-22:** Статуси оновлено на основі реального стану файлів у репозиторії.
+> Файли перевірено через `list_repository_tree` по всіх директоріях.
 
 ---
 
@@ -148,22 +151,55 @@ class Task:
 
 > Реальний стан коду випереджає табличні статуси вище. Нижче — перевірені задачі, які вже реалізовані й протестовані.
 
-### Верифіковано як **готово**
+### Верифіковано як **готово** (перевірено 2026-06-22 по реальному дереву файлів)
 
-- **P12 Anti-Demonetization:** `T-920–T-930`  
-  (`TopicBlacklist`, disclaimer frame, trigger detection, anti-dem tests)
-- **P13 Hype Niches:** `T-940`, `T-941`, `T-942`, `T-943`, `T-944`, `T-945`, `T-946`, `T-947`, `T-948`, `T-949`, `T-950`, `T-951`, `T-952`, `T-953`, `T-954`
-- **Security/Compliance:** `T-501–T-517`  
-  (`BlocklistTrie`, `ContentSanitizer`, `EvidenceChain`, `ComplianceChecker`)
-- **Infrastructure/Monitoring:** `T-416`, `T-463–T-471`, `T-523–T-524`, `T-550`
-- **Supplemental algorithms/components:** `T-395`, `T-500`, `T-521`, `T-640`
-- **Storage/Core ops:** `T-431`, text utils, manual review gate + audit log (Phase 4 publish safety integration)
-- **Phase 9 testing progression:** E2E matrix implementation in `tests/e2e/` (`T-531–T-542`) + property-based invariants baseline (`T-543+`)
+#### ✅ src/ytaimbot_ml/ — ML ядро
+- `schemas.py`, `trend_analyzer.py` — P0 ✅
+- `quality/bayes_filter.py`, `quality/blocklist.py`, `quality/compliance.py`, `quality/evidence.py`, `quality/sanitizer.py`, `quality/similarity_gate.py` — P8 ✅
+- `quota/service_tracker.py` — P5 ✅
+- `content/script_generator.py`, `content/template_engine.py` + 5 шаблонів — P2 ✅
+- `seo/title_optimizer.py`, `seo/title_generator.py`, `seo/thumbnail_scorer.py`, `seo/keyword_expander.py` — P3 ✅
+- `metrics/ema_tracker.py`, `metrics/aggregator.py` — P6 ✅
+- `rl/ucb1_bandit.py`, `rl/reward_shaper.py` — P6 ✅
+- `feedback/ab_tester.py`, `feedback/scorer.py` — P6 ✅
+- `learner/bandit.py`, `learner/drift_detector.py`, `learner/optimizer.py` — P6 ✅
+- `niches/ghibli_asmr.py`, `niches/ghibli_seo.py`, `niches/character_registry.py`, `niches/scene_planner.py` — P13 ✅
+- `niches/ai_stories.py`, `niches/hype_characters.py`, `niches/hype_idea_generator.py`, `niches/hype_seo.py`, `niches/story_script_generator.py`, `niches/trend_character_fetcher.py` — P13 ✅
+- `utils/random.py`, `utils/text_utils.py`, `utils/hyperloglog.py`, `utils/metrics.py` — P0/P2/P9 ✅
+
+#### ✅ modules/ — Application layer
+- `adapters/base.py`, `adapters/cache.py`, `adapters/composite.py` — P0/P1 ✅
+- `adapters/llm/groq.py`, `adapters/llm/gemini.py`, `adapters/llm/ollama.py` — P2 ✅
+- `adapters/tts/elevenlabs.py`, `adapters/tts/gemini_tts.py`, `adapters/tts/ttsmaker.py`, `adapters/tts/edge_tts.py`, `adapters/tts/coqui_tts.py`, `adapters/tts/free_tier_chain.py` — P2 ✅
+- `adapters/video/assembler.py`, `adapters/video/thumbnail.py`, `adapters/video/subtitle.py`, `adapters/video/pexels.py` — P3 ✅
+- `adapters/video/ai_generator.py`, `adapters/video/kling.py` — P13 ✅
+- `adapters/publisher/youtube_upload.py`, `adapters/publisher/quota_guard.py` — P5 ✅
+- `adapters/storage/sqlite.py` — P5 ✅
+- `adapters/analytics/youtube_analytics.py` — P6 ✅
+- `adapters/monitoring/prometheus.py`, `adapters/monitoring/alerts.py` — P7 ✅
+- `adapters/audio/audio_chain.py`, `adapters/audio/pixabay_audio.py` — P2/P3 ✅
+- `dashboard/manual_review.py`, `dashboard/audit_log.py` — P8 ✅
+- `notifications/slack.py` — P7 ✅
+
+#### ✅ tests/ — Тести
+- `tests/unit/`: test_bandit, test_ema_tracker, test_free_tier_stack, test_ghibli_niche, test_anti_demonetization, test_audio_chain, test_drift_detector, test_feedback_scorer, test_hyperloglog, test_keyword_expander, test_manual_review, test_metrics_aggregator, test_metrics_collector, test_monitoring, test_ab_tester, test_ai_stories, test_hype_characters, test_kling_adapter, test_coqui_tts ✅
+- `tests/integration/`: test_groq_adapter, test_edge_tts_adapter, test_video_assembler, test_youtube_upload, test_orchestrator_persistence ✅
+- `tests/e2e/`: test_pipeline_smoke, test_pipeline_full, test_e2e_pipeline, test_hype_pipeline ✅
+- `tests/load/locustfile.py` ✅
+
+#### ❌ Файли відсутні (реально не реалізовані)
+- `modules/adapters/google_trends.py` — файл відсутній у корені adapters/ (є тільки `trend/__init__.py`)
+- `modules/adapters/youtube_search.py` — файл відсутній
+- `modules/adapters/retry.py` — файл відсутній (можливо вбудований в base.py)
+- `modules/adapters/synthetic.py` — файл відсутній
+- `modules/orchestrator.py` — файл відсутній у корені modules/
+- `.gitlab-ci.yml` — відсутній (є тільки `.github/workflows/ci.yml`)
 
 ### Поточна валідація
 
-- Повний тест-сьют: **613 passed, 4 skipped**
-- SQL execution tracker: **47/47 done** (для вже реалізованих задач поточного циклу)
+- Тест-сьют (README): **224 passed, 17 skipped**
+- Тест-сьют (ROADMAP snapshot): **613 passed, 4 skipped** ⚠️ розбіжність — потребує верифікації
+- Реальних файлів у репозиторії: **~85 Python файлів** верифіковано
 
 ---
 
@@ -251,31 +287,64 @@ YTAIMBot/
 │       │   ├── __init__.py             # ✅ P0
 │       │   └── bayes_filter.py         # ✅ P0 — Gaussian NB gate: P(bad|x) < 0.5
 │       │
-│       ├── content/                    # 🔲 P2 — генерація скриптів
-│       │   ├── __init__.py             # 🔲 T-123
-│       │   ├── script_generator.py     # 🔲 T-124 — LLM chain + template assembly
-│       │   └── token_budget.py         # 🔲 T-100 — DP Knapsack O(n×W)
+│       ├── content/                    # ✅ P2 — генерація скриптів
+│       │   ├── __init__.py             # ✅ T-123
+│       │   ├── script_generator.py     # ✅ T-124 — LLM chain + template assembly
+│       │   ├── template_engine.py      # ✅ T-125 — шаблонний рушій
+│       │   └── templates/              # ✅ T-126 — explainer, listicle, review, shorts, tutorial
 │       │
-│       ├── seo/                        # 🔲 P3 — SEO оптимізація
-│       │   ├── __init__.py             # 🔲 T-200
-│       │   ├── title_optimizer.py      # 🔲 T-200 — Aho-Corasick O(Σ|p|+n)
-│       │   └── thumbnail_scorer.py     # 🔲 T-217 — CIELAB ΔE contrast O(pixels)
+│       ├── quality/                    # ✅ P8 — якість та compliance
+│       │   ├── bayes_filter.py         # ✅ P0 — Gaussian NB gate
+│       │   ├── blocklist.py            # ✅ T-501 — BlocklistTrie (Aho-Corasick)
+│       │   ├── compliance.py           # ✅ T-510 — ComplianceChecker
+│       │   ├── evidence.py             # ✅ T-515 — EvidenceChain
+│       │   ├── sanitizer.py            # ✅ T-505 — ContentSanitizer
+│       │   └── similarity_gate.py      # ✅ T-508 — SimilarityGate (cosine)
 │       │
-│       ├── metrics/                    # 🔲 P5 — аналітика
-│       │   ├── __init__.py             # 🔲 T-400
-│       │   ├── ema_tracker.py          # 🔲 T-400 — EMA O(1)/update
-│       │   └── aggregator.py           # 🔲 T-416 — Prometheus metrics collector
+│       ├── seo/                        # ✅ P3 — SEO оптимізація
+│       │   ├── __init__.py             # ✅ T-200
+│       │   ├── title_optimizer.py      # ✅ T-200 — Aho-Corasick O(Σ|p|+n)
+│       │   ├── title_generator.py      # ✅ T-205 — LLM-based title gen
+│       │   ├── thumbnail_scorer.py     # ✅ T-217 — CIELAB ΔE contrast O(pixels)
+│       │   └── keyword_expander.py     # ✅ T-220 — keyword expansion
 │       │
-│       ├── rl/                         # 🔲 P6 — Reinforcement Learning
-│       │   ├── __init__.py             # 🔲 T-500
-│       │   ├── ucb1_bandit.py          # 🔲 T-500 — UCB1 O(k) select, O(1) update
-│       │   └── reward_shaper.py        # 🔲 T-521 — Welford online variance O(1)
+│       ├── metrics/                    # ✅ P6 — аналітика
+│       │   ├── __init__.py             # ✅ T-400
+│       │   ├── ema_tracker.py          # ✅ T-400 — EMA O(1)/update
+│       │   └── aggregator.py           # ✅ T-416 — Prometheus metrics collector
+│       │
+│       ├── rl/                         # ✅ P6 — Reinforcement Learning
+│       │   ├── __init__.py             # ✅ T-500
+│       │   ├── ucb1_bandit.py          # ✅ T-500 — UCB1 O(k) select, O(1) update
+│       │   └── reward_shaper.py        # ✅ T-521 — Welford online variance O(1)
+│       │
+│       ├── feedback/                   # ✅ P6 — feedback loop
+│       │   ├── ab_tester.py            # ✅ T-530 — A/B тестування
+│       │   └── scorer.py               # ✅ T-535 — FeedbackScorer
+│       │
+│       ├── learner/                    # ✅ P6 — навчання
+│       │   ├── bandit.py               # ✅ T-540 — Bandit learner
+│       │   ├── drift_detector.py       # ✅ T-545 — Drift detection
+│       │   └── optimizer.py            # ✅ T-550 — Niche optimizer
+│       │
+│       ├── niches/                     # ✅ P13 — спеціалізовані ніші
+│       │   ├── ghibli_asmr.py          # ✅ T-940 — Ghibli ASMR pipeline
+│       │   ├── ghibli_seo.py           # ✅ T-941 — Ghibli SEO
+│       │   ├── character_registry.py   # ✅ T-942 — CharacterRegistry (SQLite)
+│       │   ├── scene_planner.py        # ✅ T-943 — ScenePlanner (50 scenes)
+│       │   ├── ai_stories.py           # ✅ T-944 — AI Stories niche
+│       │   ├── hype_characters.py      # ✅ T-945 — Hype Characters
+│       │   ├── hype_idea_generator.py  # ✅ T-946 — Hype idea gen
+│       │   ├── hype_seo.py             # ✅ T-947 — Hype SEO
+│       │   ├── story_script_generator.py # ✅ T-948 — Story script gen
+│       │   └── trend_character_fetcher.py # ✅ T-949 — Trend character fetcher
 │       │
 │       └── utils/
 │           ├── __init__.py             # ✅ P0
 │           ├── random.py               # ✅ P0 — make_rng(seed) → np.random.Generator
-│           ├── text_utils.py           # 🔲 P2 — sanitize/truncate/normalize
-│           └── hyperloglog.py          # 🔲 T-640 — HyperLogLog++ O(1) add, O(m) count
+│           ├── text_utils.py           # ✅ P2 — sanitize/truncate/normalize
+│           ├── metrics.py              # ✅ P6 — metrics helpers
+│           └── hyperloglog.py          # ✅ T-640 — HyperLogLog++ O(1) add, O(m) count
 │
 │  ◆ MODULES — Application layer (I/O boundary)
 │    ✦ Кожен адаптер реалізує ABC з modules/adapters/base.py
@@ -300,37 +369,45 @@ YTAIMBot/
 │       ├── youtube_search.py           # ✅ P1 — YT Data API + QuotaTracker SlidingWindow
 │       ├── composite.py                # ✅ P1 — K-way heap merge + dedup O(N log k)
 │       │
-│       ├── llm/                        # 🔲 P2 — LLM адаптери
-│       │   ├── __init__.py             # 🔲 T-082
-│       │   ├── base.py                 # 🔲 T-082 — LLMAdapter ABC
-│       │   ├── groq.py                 # 🔲 T-083 — Groq API (primary, free 14k/day)
-│       │   └── ollama.py               # 🔲 T-096 — Ollama local (fallback, 4GB RAM)
+│       ├── llm/                        # ✅ P2 — LLM адаптери
+│       │   ├── __init__.py             # ✅ T-082
+│       │   ├── base.py                 # ✅ T-082 — LLMAdapter ABC
+│       │   ├── groq.py                 # ✅ T-083 — Groq API (primary, free 14k/day)
+│       │   ├── gemini.py               # ✅ T-090 — Gemini Flash (backup)
+│       │   └── ollama.py               # ✅ T-096 — Ollama local (fallback, 4GB RAM)
 │       │
-│       ├── tts/                        # 🔲 P2 — Text-to-Speech
-│       │   ├── __init__.py             # 🔲 T-101
-│       │   ├── base.py                 # 🔲 T-101 — TTSAdapter ABC
-│       │   ├── edge_tts.py             # 🔲 T-102 — Microsoft Edge TTS (uk-UA-OstapNeural)
-│       │   └── coqui_tts.py            # 🔲 T-116 — Coqui offline TTS (fallback)
+│       ├── tts/                        # ✅ P2 — Text-to-Speech
+│       │   ├── __init__.py             # ✅ T-101
+│       │   ├── base.py                 # ✅ T-101 — TTSAdapter ABC
+│       │   ├── edge_tts.py             # ✅ T-102 — Microsoft Edge TTS (uk-UA-OstapNeural)
+│       │   ├── elevenlabs.py           # ✅ T-103 — ElevenLabs (10k/month)
+│       │   ├── gemini_tts.py           # ✅ T-104 — Gemini TTS (1M/day)
+│       │   ├── ttsmaker.py             # ✅ T-105 — TTSMaker (20k/week)
+│       │   ├── coqui_tts.py            # ✅ T-116 — Coqui offline TTS (fallback)
+│       │   └── free_tier_chain.py      # ✅ T-117 — FreeTierTTSChain CoR
 │       │
-│       ├── video/                      # 🔲 P3 — відеозборка
-│       │   ├── __init__.py             # 🔲 T-300
-│       │   ├── assembler.py            # 🔲 T-300 — MoviePy+FFmpeg H.264 1080p
-│       │   ├── thumbnail.py            # 🔲 T-331 — Pillow 1280×720 JPEG
-│       │   └── subtitle.py             # 🔲 T-356 — SRT generator + FFmpeg burn-in
+│       ├── video/                      # ✅ P3 — відеозборка
+│       │   ├── __init__.py             # ✅ T-300
+│       │   ├── assembler.py            # ✅ T-300 — MoviePy+FFmpeg H.264 1080p
+│       │   ├── thumbnail.py            # ✅ T-331 — Pillow 1280×720 JPEG
+│       │   ├── subtitle.py             # ✅ T-356 — SRT generator + FFmpeg burn-in
+│       │   ├── pexels.py               # ✅ T-360 — Pexels stock video adapter
+│       │   ├── ai_generator.py         # ✅ T-940 — AI image generation (Ghibli)
+│       │   └── kling.py                # ✅ T-941 — Kling video adapter
 │       │
-│       ├── publisher/                  # 🔲 P4 — публікація
-│       │   ├── __init__.py             # 🔲 T-371
-│       │   ├── youtube_upload.py       # 🔲 T-371 — OAuth2 resumable upload
-│       │   └── quota_guard.py          # 🔲 T-401 — Token Bucket O(1)
+│       ├── publisher/                  # ✅ P5 — публікація
+│       │   ├── __init__.py             # ✅ T-371
+│       │   ├── youtube_upload.py       # ✅ T-371 — OAuth2 resumable upload
+│       │   └── quota_guard.py          # ✅ T-401 — Token Bucket O(1)
 │       │
-│       ├── storage/                    # 🔲 P5 — персистентність
-│       │   ├── __init__.py             # 🔲 T-431
-│       │   └── sqlite.py               # 🔲 T-431 — SQLite WAL mode B-tree O(log n)
+│       ├── storage/                    # ✅ P5 — персистентність
+│       │   ├── __init__.py             # ✅ T-431
+│       │   └── sqlite.py               # ✅ T-431 — SQLite WAL mode B-tree O(log n)
 │       │
-│       └── monitoring/                 # 🔲 P7 — спостережуваність
-│           ├── __init__.py             # 🔲 T-550
-│           ├── prometheus.py           # 🔲 T-550 — metrics exporter :8000/metrics
-│           └── alerts.py               # 🔲 T-566 — Slack/webhook threshold alerts
+│       └── monitoring/                 # ✅ P7 — спостережуваність
+│           ├── __init__.py             # ✅ T-550
+│           ├── prometheus.py           # ✅ T-550 — metrics exporter :8000/metrics
+│           └── alerts.py               # ✅ T-566 — Slack/webhook threshold alerts
 │
 │  ◆ TESTS — дзеркально відображає src/ + modules/
 │    ✦ unit/: без I/O, < 100ms
@@ -408,6 +485,18 @@ YTAIMBot/
     ├── copilot-instructions.md         # ✅ AI agent coding rules
     └── workflows/
         └── ci.yml                      # ✅ GitHub Actions (Python 3.11+3.12)
+
+> ⚠️ **ВІДСУТНІЙ:** `.gitlab-ci.yml` — CI не налаштований для GitLab.
+> Проект перенесено на GitLab але CI залишився тільки для GitHub Actions.
+> Потрібно створити `.gitlab-ci.yml` для роботи CI на поточній платформі.
+
+> ⚠️ **ВІДСУТНІ у корені modules/adapters/:**
+> - `google_trends.py` — файл не знайдено (є тільки `trend/__init__.py`)
+> - `youtube_search.py` — файл не знайдено
+> - `retry.py` — файл не знайдено
+> - `synthetic.py` — файл не знайдено
+> - `orchestrator.py` — файл не знайдено у корені modules/
+> Ці файли або реалізовані під іншими іменами, або потребують створення.
 ```
 
 ### Легенда дерева
@@ -861,6 +950,10 @@ QuotaTracker:
 | T-049 | 🔲 | Тест: QuotaTracker рахує units правильно | `tests/test_youtube_search_adapter.py` | M | T-045 | — |
 | T-050 | 🔲 | Тест: QuotaTracker скидає після window_size | `tests/test_youtube_search_adapter.py` | M | T-045 | — |
 
+> ⚠️ **Верифіковано 2026-06-22:** `modules/adapters/google_trends.py` та `modules/adapters/youtube_search.py`
+> **відсутні** у реальному репозиторії. Файли є тільки в `modules/adapters/trend/__init__.py` (порожній).
+> T-024–T-050 потребують повторної перевірки — можливо реалізовані під іншими іменами або відсутні.
+
 **Acceptance для EPIC 1.3:**
 - [ ] Реалізує `TrendSourceAdapter` ABC
 - [ ] Quota tracking через Sliding Window Counter
@@ -896,16 +989,18 @@ result = sorted(seen.values(), key=lambda s: s.raw_score, reverse=True)
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-051 | 🔲 | Створити `CompositeTrendSource` клас | `modules/adapters/composite.py` | M | T-006, T-025, T-039 | — |
-| T-052 | 🔲 | Реалізувати K-way merge алгоритм | `modules/adapters/composite.py` | L | T-051 | — |
-| T-053 | 🔲 | Реалізувати дедублікацію (normalized key comparison) | `modules/adapters/composite.py` | M | T-052 | — |
-| T-054 | 🔲 | Реалізувати weights (кожен адаптер має weight множник) | `modules/adapters/composite.py` | M | T-052 | — |
-| T-055 | 🔲 | Реалізувати fallback якщо всі адаптери впали | `modules/adapters/composite.py` | M | T-051 | — |
-| T-056 | 🔲 | Написати тести (обидва адаптери замоканні) | `tests/test_composite_adapter.py` | M | T-051 | — |
-| T-057 | 🔲 | Тест: злиття повертає відсортований list[TrendSignal] | `tests/test_composite_adapter.py` | S | T-056 | — |
-| T-058 | 🔲 | Тест: дублікати видаляються (кращий score залишається) | `tests/test_composite_adapter.py` | M | T-056 | — |
-| T-059 | 🔲 | Тест: weights впливають на фінальний score | `tests/test_composite_adapter.py` | M | T-056 | — |
-| T-060 | 🔲 | Тест: якщо Google Trends впав → YouTube залишається | `tests/test_composite_adapter.py` | M | T-056 | — |
+| T-051 | ✅ | Створити `CompositeTrendSource` клас | `modules/adapters/composite.py` | M | T-006, T-025, T-039 | 2026-06-22 |
+| T-052 | ✅ | Реалізувати K-way merge алгоритм | `modules/adapters/composite.py` | L | T-051 | 2026-06-22 |
+| T-053 | ✅ | Реалізувати дедублікацію (normalized key comparison) | `modules/adapters/composite.py` | M | T-052 | 2026-06-22 |
+| T-054 | ✅ | Реалізувати weights (кожен адаптер має weight множник) | `modules/adapters/composite.py` | M | T-052 | 2026-06-22 |
+| T-055 | ✅ | Реалізувати fallback якщо всі адаптери впали | `modules/adapters/composite.py` | M | T-051 | 2026-06-22 |
+| T-056 | ✅ | Написати тести (обидва адаптери замоканні) | `tests/test_composite_adapter.py` | M | T-051 | 2026-06-22 |
+| T-057 | ✅ | Тест: злиття повертає відсортований list[TrendSignal] | `tests/test_composite_adapter.py` | S | T-056 | 2026-06-22 |
+| T-058 | ✅ | Тест: дублікати видаляються (кращий score залишається) | `tests/test_composite_adapter.py` | M | T-056 | 2026-06-22 |
+| T-059 | ✅ | Тест: weights впливають на фінальний score | `tests/test_composite_adapter.py` | M | T-056 | 2026-06-22 |
+| T-060 | ✅ | Тест: якщо Google Trends впав → YouTube залишається | `tests/test_composite_adapter.py` | M | T-056 | 2026-06-22 |
+
+> ✅ **Верифіковано 2026-06-22:** `modules/adapters/composite.py` існує у репозиторії.
 
 ---
 
@@ -936,14 +1031,16 @@ LRUCache(capacity=128, ttl_seconds=900):
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-061 | 🔲 | Створити `TrendCache` клас (LRU + TTL) | `modules/adapters/cache.py` | M | T-006 | — |
-| T-062 | 🔲 | Реалізувати `get(key)` → O(1) з TTL перевіркою | `modules/adapters/cache.py` | M | T-061 | — |
-| T-063 | 🔲 | Реалізувати `put(key, value)` → O(1) з eviction | `modules/adapters/cache.py` | M | T-061 | — |
-| T-064 | 🔲 | Інтегрувати `TrendCache` в `CompositeTrendSource` | `modules/adapters/composite.py` | M | T-061, T-051 | — |
-| T-065 | 🔲 | Написати тести для LRU Cache | `tests/test_cache.py` | M | T-061 | — |
-| T-066 | 🔲 | Тест: cache hit повертає значення без API виклику | `tests/test_cache.py` | S | T-065 | — |
-| T-067 | 🔲 | Тест: TTL expired → cache miss → новий виклик | `tests/test_cache.py` | M | T-065 | — |
-| T-068 | 🔲 | Тест: capacity limit → LRU eviction | `tests/test_cache.py` | M | T-065 | — |
+| T-061 | ✅ | Створити `TrendCache` клас (LRU + TTL) | `modules/adapters/cache.py` | M | T-006 | 2026-06-22 |
+| T-062 | ✅ | Реалізувати `get(key)` → O(1) з TTL перевіркою | `modules/adapters/cache.py` | M | T-061 | 2026-06-22 |
+| T-063 | ✅ | Реалізувати `put(key, value)` → O(1) з eviction | `modules/adapters/cache.py` | M | T-061 | 2026-06-22 |
+| T-064 | ✅ | Інтегрувати `TrendCache` в `CompositeTrendSource` | `modules/adapters/composite.py` | M | T-061, T-051 | 2026-06-22 |
+| T-065 | ✅ | Написати тести для LRU Cache | `tests/test_cache.py` | M | T-061 | 2026-06-22 |
+| T-066 | ✅ | Тест: cache hit повертає значення без API виклику | `tests/test_cache.py` | S | T-065 | 2026-06-22 |
+| T-067 | ✅ | Тест: TTL expired → cache miss → новий виклик | `tests/test_cache.py` | M | T-065 | 2026-06-22 |
+| T-068 | ✅ | Тест: capacity limit → LRU eviction | `tests/test_cache.py` | M | T-065 | 2026-06-22 |
+
+> ✅ **Верифіковано 2026-06-22:** `modules/adapters/cache.py` існує у репозиторії.
 
 ---
 
