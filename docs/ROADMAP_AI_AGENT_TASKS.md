@@ -1356,14 +1356,14 @@ select_template(plan: ContentPlan, templates: list[Template]) -> Template:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-151 | 🔲 | Розширити `PipelineResult` полями script_path, audio_path | `src/ytaimbot_ml/schemas.py` | S | T-002 | — |
-| T-152 | 🔲 | Додати `_generate_script()` стадію у Pipeline | `modules/orchestrator.py` | L | T-125, T-008 | — |
-| T-153 | 🔲 | Додати `_synthesize_audio()` стадію у Pipeline | `modules/orchestrator.py` | L | T-114, T-152 | — |
-| T-154 | 🔲 | Зберігати Script та audio path у PipelineResult | `modules/orchestrator.py` | M | T-151, T-152 | — |
-| T-155 | 🔲 | Додати `GROQ_API_KEY`, `GEMINI_API_KEY` до .env.example | `.env.example` | S | T-083 | — |
-| T-156 | 🔲 | Додати `TTS_LANGUAGE`, `TTS_GENDER`, `ELEVENLABS_API_KEY` до .env.example | `.env.example` | S | T-100 | — |
-| T-157 | 🔲 | Оновити docker-compose.yml з новими env vars | `docker-compose.yml` | S | T-155, T-156 | — |
-| T-158 | 🔲 | Написати інтеграційні тести Phase 2 Pipeline | `tests/test_orchestrator.py` | L | T-152, T-153 | — |
+| T-151 | ✅ | Розширити `PipelineResult` полями script_path, audio_path | `src/ytaimbot_ml/schemas.py` | S | T-002 | 2026-06-22 |
+| T-152 | ✅ | Додати `_generate_script()` стадію у Pipeline | `modules/orchestrator.py` | L | T-125, T-008 | 2026-06-22 |
+| T-153 | ✅ | Додати `_synthesize_audio()` стадію у Pipeline | `modules/orchestrator.py` | L | T-114, T-152 | 2026-06-22 |
+| T-154 | ✅ | Зберігати Script та audio path у PipelineResult | `modules/orchestrator.py` | M | T-151, T-152 | 2026-06-22 |
+| T-155 | ✅ | Додати `GROQ_API_KEY`, `GEMINI_API_KEY` до .env.example | `.env.example` | S | T-083 | 2026-03-22 |
+| T-156 | ✅ | Додати `TTS_LANGUAGE`, `TTS_GENDER`, `ELEVENLABS_API_KEY` до .env.example | `.env.example` | S | T-100 | 2026-03-22 |
+| T-157 | ✅ | Оновити docker-compose.yml з новими env vars | `docker-compose.yml` | S | T-155, T-156 | 2026-03-22 |
+| T-158 | ✅ | Написати інтеграційні тести Phase 2 Pipeline | `tests/unit/test_pipeline_phase2.py` | L | T-152, T-153 | 2026-06-22 |
 | T-159 | 🔲 | Запустити `pytest -q --tb=short` → всі зелені | CI | S | T-158 | — |
 | T-160 | 🔲 | Перевірити coverage ≥ 80% для нових модулів | CI | S | T-159 | — |
 
@@ -1481,7 +1481,7 @@ ThumbnailGenerator.generate(title, color_scheme) → Image:
 | T-184 | ✅ | Тест: вихід — 1280×720 пікселів | `tests/test_thumbnail.py` | S | T-183 | 2026-03-22 |
 | T-185 | ✅ | Тест: розмір файлу ≤ 2MB | `tests/test_thumbnail.py` | S | T-183 | 2026-03-22 |
 | T-186 | ✅ | Тест: title присутній у зображенні (OCR-free перевірка через mock) | `tests/test_thumbnail.py` | S | T-183 | 2026-03-22 |
-| T-187 | 🔲 | Тест: всі 5 ColorScheme генерують без помилок | `tests/test_thumbnail.py` | M | T-183 | — |
+| T-187 | ✅ | Тест: всі 5 ColorScheme генерують без помилок | `tests/unit/test_thumbnail_colorschemes.py` | M | T-183 | 2026-06-22 |
 
 ---
 
