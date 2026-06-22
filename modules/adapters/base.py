@@ -4,9 +4,9 @@ Adapters
 --------
 TrendSourceAdapter  : fetch() → list[TrendSignal]
 StorageAdapter      : save_run / save_trends / save_compliance
-PublisherAdapter    : publish(plan, report) → bool
-LLMAdapter          : generate(prompt, max_tokens) → str          [Phase 2]
-TTSAdapter          : speak(text, output_path) → Path             [Phase 2]
+PublisherAdapter    : publish(plan, report) → UploadResult   [T-244 fix]
+LLMAdapter          : generate(prompt, max_tokens) → str     [Phase 2]
+TTSAdapter          : speak(text, output_path) → Path        [Phase 2]
 """
 
 from __future__ import annotations
@@ -14,7 +14,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from ytaimbot_ml.schemas import ComplianceReport, ContentPlan, TrendSignal, MetricsSnapshot
+from ytaimbot_ml.schemas import (
+    ComplianceReport,
+    ContentPlan,
+    MetricsSnapshot,
+    TrendSignal,
+    UploadResult,
+)
 
 
 class TrendSourceAdapter(ABC):
@@ -90,11 +96,23 @@ class StorageAdapter(ABC):
         """Load UCB1 bandit arm stats."""
 
     @abstractmethod
-    def save_bandit_state(self, arm_id: str, n_pulls: int, total_reward: float, last_reward: float) -> None:
+    def save_bandit_state(
+        self,
+        arm_id: str,
+        n_pulls: int,
+        total_reward: float,
+        last_reward: float,
+    ) -> None:
         """Save UCB1 bandit arm stats."""
 
     @abstractmethod
-    def save_ppo_transition(self, video_id: str, state: list[float], action_idx: int, prob: float) -> None:
+    def save_ppo_transition(
+        self,
+        video_id: str,
+        state: list[float],
+        action_idx: int,
+        prob: float,
+    ) -> None:
         """Save a PPO transition for later reward update."""
 
     @abstractmethod
@@ -107,16 +125,38 @@ class StorageAdapter(ABC):
 
 
 class PublisherAdapter(ABC):
-    """Publishes approved content plans to the target platform."""
+    """Publishes approved content plans to the target platform.
+
+    Contract (T-244 fix):
+        publish() MUST return an UploadResult, not bool.
+        Callers check result.success (bool property on UploadResult).
+        On dry-run or failure, return UploadResult with empty video_id.
+    """
 
     @abstractmethod
-    def publish(self, plan: ContentPlan, compliance_report: ComplianceReport) -> bool:
+    def publish(
+        self, plan: ContentPlan, compliance_report: ComplianceReport
+    ) -> UploadResult:
         """Publish a content plan that has passed the compliance gate.
+
+        Parameters
+        ----------
+        plan:
+            Approved content plan.
+        compliance_report:
+            Must have ``decision == "pass"`` — fail-closed guard.
 
         Returns
         -------
-        bool
-            ``True`` if publication succeeded, ``False`` otherwise.
+        UploadResult
+            Contains ``video_id``, ``url``, ``success`` (bool property).
+            Return ``UploadResult(plan_id=plan.trend_id)`` (empty video_id)
+            to signal failure without raising.
+
+        Raises
+        ------
+        ValueError
+            If ``compliance_report.decision != "pass"``.
         """
 
 
@@ -219,4 +259,3 @@ class TTSAdapter(ABC):
         >>> path.exists()
         True
         """
-
