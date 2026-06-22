@@ -372,7 +372,29 @@ class ContentAction:
 
 @dataclass
 class PipelineResult:
-    """Aggregated result of a full pipeline run."""
+    """Aggregated result of a full pipeline run.
+
+    Parameters
+    ----------
+    run_id:
+        Unique identifier for this pipeline run.
+    script_path:
+        Path to the generated script file (set after Stage 7 SCRIPT). T-151
+    audio_path:
+        Path to the synthesized audio file (set after Stage 8 AUDIO). T-151
+
+    Complexity
+    ----------
+    O(1) — pure data container
+
+    Examples
+    --------
+    >>> r = PipelineResult(run_id="run_001")
+    >>> r.status
+    'pending'
+    >>> r.script_path is None
+    True
+    """
 
     run_id: str
     rankings: list[TrendRanking] = field(default_factory=list)
@@ -382,5 +404,8 @@ class PipelineResult:
     videos: list[VideoAsset] = field(default_factory=list)
     uploads: list[UploadResult] = field(default_factory=list)
     status: str = "pending"  # "ok" | "blocked" | "error"
+    # T-151: Phase 2 integration fields
+    script_path: str | None = None   # path to generated .txt script file
+    audio_path: str | None = None    # path to synthesized .mp3 audio file
 
 

@@ -482,18 +482,32 @@ class YTAIMBotOrchestrator(object):
                 self.storage.save_run(run_id, "blocked")
                 return result
 
-            # Optional: Simulate TTS if available
-            if self.config.get("ENABLE_TTS", "0").lower() == "1":
-                tts_adapter = build_tts_adapter()
-                if tts_adapter:
-                    audio_path = Path(f"/tmp/{run_id}.mp3")
-                    try:
-                        tts_adapter.speak(script.full_text, audio_path)
-                        logger.info("[%s] TTS generated audio: %s", run_id, audio_path)
-                    except Exception as e:
-                        logger.error("[%s] TTS failed: %s", run_id, e)
-                else:
-                    logger.warning("[%s] TTS adapter not available.", run_id)
+            # Stage 7: _generate_script — save script to disk (T-152, T-154)
+            data_dir = Path(self.config.get("YTAIMBOT_DATA_DIR", "/tmp"))
+            script_dir = data_dir / "scripts"
+            script_dir.mkdir(parents=True, exist_ok=True)
+            script_file = script_dir / f"{run_id}.txt"
+            try:
+                script_file.write_text(script.full_text, encoding="utf-8")
+                result.script_path = str(script_file)
+                logger.info("[%s] Script saved: %s (%d words)", run_id, script_file, script.total_words)
+            except OSError as e:
+                logger.warning("[%s] Could not save script to disk: %s", run_id, e)
+
+            # Stage 8: _synthesize_audio — TTS synthesis (T-153, T-154)
+            audio_dir = data_dir / "audio"
+            audio_dir.mkdir(parents=True, exist_ok=True)
+            audio_path = audio_dir / f"{run_id}.mp3"
+            tts_adapter = build_tts_adapter()
+            if tts_adapter:
+                try:
+                    tts_adapter.speak(script.full_text, audio_path)
+                    result.audio_path = str(audio_path)
+                    logger.info("[%s] Audio synthesized: %s", run_id, audio_path)
+                except Exception as e:
+                    logger.warning("[%s] TTS failed (non-fatal): %s", run_id, e)
+            else:
+                logger.info("[%s] TTS adapter not available — audio skipped", run_id)
 
 
             # 6. Video Assembly
