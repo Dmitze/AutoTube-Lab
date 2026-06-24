@@ -43,14 +43,6 @@ services:
       - PROMETHEUS_PORT=${PROMETHEUS_PORT:-8000}
       - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
 
-  # Optional: local Ollama (uncomment if using local LLM on VPS with 4GB+ RAM)
-  # ollama:
-  #   image: ollama/ollama:latest
-  #   restart: unless-stopped
-  #   volumes:
-  #     - ollama_data:/root/.ollama
-  #   profiles: ["ollama"]
-
   # Optional: Monitoring stack (uncomment for Prometheus + Grafana)
   # prometheus:
   #   image: prom/prometheus:latest
