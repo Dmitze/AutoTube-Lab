@@ -35,3 +35,6 @@ htmlcov/
 # Data directory (runtime output)
 data/
 .hypothesis/
+
+.gemini/
+gha-creds-*.json
