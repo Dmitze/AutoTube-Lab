@@ -17,6 +17,7 @@ Design decisions
 from __future__ import annotations
 
 import math
+from typing import Any
 
 from ytaimbot_ml.schemas import ComplianceReport
 
@@ -45,7 +46,28 @@ class BayesQualityFilter:
     # Public API
     # ------------------------------------------------------------------
 
-    def score(self, features: dict[str, float]) -> float:
+    def _sanitize_features(self, features: Any) -> dict[str, float]:
+        """Convert any features input (dict, ndarray, list, tuple) to a dict of float."""
+        if features is None:
+            return {}
+        if isinstance(features, dict):
+            return dict(features)
+        
+        # Check for numpy array type without triggering truth value evaluation
+        try:
+            import numpy as np
+            if isinstance(features, np.ndarray):
+                flat = features.ravel()
+                return {f"f{i}": float(v) for i, v in enumerate(flat)}
+        except ImportError:
+            pass
+
+        if isinstance(features, (list, tuple)):
+            return {f"f{i}": float(v) for i, v in enumerate(features)}
+        
+        return {}
+
+    def score(self, features: dict[str, float] | Any) -> float:
         """Return P(bad | features) in [0, 1].
 
         Complexity: O(n_features).
@@ -64,13 +86,14 @@ class BayesQualityFilter:
         float
             Posterior probability of badness.
         """
-        if not features:
+        features_dict = self._sanitize_features(features)
+        if not features_dict:
             return self.prior_bad
 
         log_p_bad = math.log(self.prior_bad)
         log_p_good = math.log(1.0 - self.prior_bad)
 
-        for val in features.values():
+        for val in features_dict.values():
             val = float(max(1e-9, min(1.0 - 1e-9, val)))
             log_p_bad += math.log(val)
             log_p_good += math.log(1.0 - val)
@@ -81,7 +104,7 @@ class BayesQualityFilter:
         p_good = math.exp(log_p_good - max_log)
         return p_bad / (p_bad + p_good)
 
-    def decide(self, features: dict[str, float]) -> ComplianceReport:
+    def decide(self, features: dict[str, float] | Any) -> ComplianceReport:
         """Return a ComplianceReport for the given feature set.
 
         Complexity: O(n_features).
@@ -96,7 +119,8 @@ class BayesQualityFilter:
         ComplianceReport
             decision is "pass" if P(bad) < threshold, else "fail".
         """
-        p_bad = self.score(features)
+        features_dict = self._sanitize_features(features)
+        p_bad = self.score(features_dict)
         decision = "fail" if p_bad >= self.threshold else "pass"
 
         reasons: list[str] = []
@@ -105,11 +129,11 @@ class BayesQualityFilter:
                 f"P(bad|features)={p_bad:.4f} exceeds threshold={self.threshold}"
             )
             # Surface the top-3 most suspicious features
-            top = sorted(features.items(), key=lambda kv: kv[1], reverse=True)[:3]
+            top = sorted(features_dict.items(), key=lambda kv: kv[1], reverse=True)[:3]
             for name, val in top:
                 reasons.append(f"  high '{name}' = {val:.3f}")
 
-        content_hash = _dict_hash(features)
+        content_hash = _dict_hash(features_dict)
         return ComplianceReport(
             content_hash=content_hash,
             similarity_score=0.0,  # placeholder; set by orchestrator if needed
