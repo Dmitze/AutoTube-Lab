@@ -332,10 +332,27 @@ class YTAIMBotOrchestrator(object):
         self.reward_shaper = RewardShaper()
 
         # UCB1 Bandit for niche selection (explore/exploit)
-        self.niche_bandit = UCB1Bandit(
-            arm_ids=self.storage.load_niche_arms(), # Fixed parameter name
-            rng=rng,
-        )
+        raw_arms = self.storage.load_niche_arms()
+        if raw_arms and isinstance(raw_arms[0], dict):
+            total_pulls = sum(arm.get("n_pulls", 0) for arm in raw_arms)
+            bandit_data = {
+                "total_pulls": total_pulls,
+                "arms": [
+                    {
+                        "arm_id": arm["arm_id"],
+                        "n_pulls": arm.get("n_pulls", 0),
+                        "total_reward": arm.get("total_reward", 0.0),
+                        "last_reward": arm.get("last_reward", 0.0)
+                    } for arm in raw_arms
+                ]
+            }
+            self.niche_bandit = UCB1Bandit.from_dict(bandit_data, rng=rng)
+        else:
+            # Fallback when database returned clean strings, is empty or other types
+            self.niche_bandit = UCB1Bandit(
+                arm_ids=raw_arms if raw_arms else ["tech", "finance"],
+                rng=rng,
+            )
         self.niche_weights = self.storage.load_niche_weights()
 
         # PPO Reinforcement Learning for content optimization
@@ -409,16 +426,17 @@ class YTAIMBotOrchestrator(object):
                 return result
 
             # 2. Trend analysis (ranking)
-            ranked_trends = self.trend_analyzer.rank_trends(trends)
+            ranked_trends = self.trend_analyzer.analyze(trends)
             result.rankings = ranked_trends
             logger.info("[%s] Ranked %d trends.", run_id, len(ranked_trends))
 
             # Select top trend for content generation (e.g., highest ranked)
             top_trend = ranked_trends[0]
+            top_keyword = next((t.keyword for t in trends if t.trend_id == top_trend.trend_id), top_trend.trend_id)
             logger.info(
                 "[%s] Selected top trend: %s (score: %.2f)",
                 run_id,
-                top_trend.keyword,
+                top_keyword,
                 top_trend.score,
             )
 
@@ -426,17 +444,17 @@ class YTAIMBotOrchestrator(object):
             # In a real scenario, this would involve more LLM calls
             content_plan = ContentPlan(
                 trend_id=top_trend.trend_id,
-                title=f"How to {top_trend.keyword}",
+                title=f"How to {top_keyword}",
                 outline=[
                     "Introduction",
-                    f"Why {top_trend.keyword} is important",
+                    f"Why {top_keyword} is important",
                     "Step-by-step guide",
                     "Conclusion",
                 ],
-                keywords=[top_trend.keyword, "tutorial", "guide"],
+                keywords=[top_keyword, "tutorial", "guide"],
             )
             result.plans.append(content_plan)
-            logger.info("[%s] Generated content plan for '%s'.", run_id, top_trend.keyword)
+            logger.info("[%s] Generated content plan for '%s'.", run_id, top_keyword)
 
             # Choose an action using the PPO policy
             content_state = np.random.rand(self.ppo_policy.state_dim) # Fixed: state is np.ndarray
@@ -656,9 +674,27 @@ class YTAIMBotOrchestrator(object):
         This method is typically called by the scheduler.
         """
         logger.info("Optimizing niche weights using UCB1 bandit.")
-        # Fetch current arm ids from storage
-        arm_ids = self.storage.load_niche_arms()
-        self.niche_bandit = UCB1Bandit(arm_ids=arm_ids, rng=self.rng)
+        # Fetch current arm data from storage
+        raw_arms = self.storage.load_niche_arms()
+
+        if raw_arms and isinstance(raw_arms[0], dict):
+            total_pulls = sum(arm.get("n_pulls", 0) for arm in raw_arms)
+            bandit_data = {
+                "total_pulls": total_pulls,
+                "arms": [
+                    {
+                        "arm_id": arm["arm_id"],
+                        "n_pulls": arm.get("n_pulls", 0),
+                        "total_reward": arm.get("total_reward", 0.0),
+                        "last_reward": arm.get("last_reward", 0.0)
+                    } for arm in raw_arms
+                ]
+            }
+            self.niche_bandit = UCB1Bandit.from_dict(bandit_data, rng=self.rng)
+            arm_ids = [arm["arm_id"] for arm in raw_arms]
+        else:
+            arm_ids = raw_arms if raw_arms else ["tech", "finance"]
+            self.niche_bandit = UCB1Bandit(arm_ids=arm_ids, rng=self.rng)
 
         # Simulate a pull for each niche to update internal states and get new weights
         for arm_id in arm_ids:
@@ -831,3 +867,27 @@ class Pipeline:
 
 
 from ytaimbot_ml.learner.optimizer import Transition # Fixed import to use learner version
+
+_plan_to_features = Pipeline._plan_to_features
+
+
+if __name__ == "__main__":
+    # Configure logging for CLI run
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    logger.info("Starting YTAIMBot Pipeline execution from CLI...")
+    try:
+        pipeline = Pipeline()
+        result = pipeline.run()
+        if result.status == "ok":
+            logger.info("Pipeline executed successfully (status: ok).")
+            exit(0)
+        else:
+            logger.error(f"Pipeline execution completed with non-ok status: {result.status}")
+            exit(1)
+    except Exception as exc:
+        logger.exception("Pipeline execution failed due to unhandled exception:")
+        exit(1)
+
