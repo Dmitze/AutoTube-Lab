@@ -7,7 +7,11 @@ import random
 import time
 from typing import Callable, ParamSpec, TypeVar
 
-from modules.adapters.errors import RetryableError
+from modules.adapters.errors import NonRetryableError, RetryableError
+
+# Re-export so callers can do:
+#   from modules.adapters.retry import NonRetryableError, RetryableError, retry
+__all__ = ["exponential_backoff", "retry", "RetryableError", "NonRetryableError"]
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
@@ -16,7 +20,7 @@ _R = TypeVar("_R")
 def exponential_backoff(
     max_retries: int,
     base_delay: float,
-    jitter: bool,
+    jitter: bool = True,
     seed: int | None = None, # Add seed parameter
 ) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
     """Decorator to retry a function with exponential backoff and optional jitter.
@@ -63,3 +67,7 @@ def exponential_backoff(
         return wrapper
 
     return decorator
+
+
+# Convenience alias used by youtube_search.py
+retry = exponential_backoff
