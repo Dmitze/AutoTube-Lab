@@ -23,6 +23,7 @@ dependencies = [
     "edge-tts>=6.1.9",
     "pydub>=0.25.1",
     "prometheus-client>=0.19",
+    "moviepy>=1.0.3",
 ]
 
 [project.optional-dependencies]
