@@ -373,13 +373,11 @@ class YTAIMBotOrchestrator(object):
                 state = np.array(json.loads(t_data["state_json"]))
                 action_idx = t_data["action_idx"] # Fixed: action is int index in LinearPPO
                 reward = 0.0 # Reward will be calculated when the actual video metrics are available
-                next_state = np.zeros(self.ppo_policy.state_dim) # Placeholder
                 self.ppo_transitions.append(
                     Transition(
                         state=state,
                         action_idx=action_idx,
                         reward=reward,
-                        next_state=next_state,
                         prob=t_data["prob"]
                     )
                 )
@@ -484,13 +482,26 @@ class YTAIMBotOrchestrator(object):
                 script = Script(plan_id=content_plan.trend_id, sections=[]) # Placeholder
 
             # 5. Content Quality & Compliance Checks
-            compliance_report = self.compliance_checker.check(script)
+            archive = self.storage.load_archive()
+            sim_report = self.compliance_checker.check(script.full_text, archive)
+            
+            # Map SimilarityReport to ComplianceReport until Bayes is fully integrated
+            from ytaimbot_ml.schemas import ComplianceReport # noqa
+            compliance_report = ComplianceReport(
+                content_hash=sim_report.content_hash,
+                similarity_score=sim_report.score,
+                bayes_p_bad=0.0,
+                decision=sim_report.decision,
+                reasons=[f"Similarity failure (score: {sim_report.score:.2f})"] if sim_report.decision == "fail" else []
+            )
+            
             self.storage.save_compliance(run_id, [compliance_report])
             result.compliance_reports.append(compliance_report)
             logger.info(
-                "[%s] Compliance check decision: %s (Bayes P(bad): %.2f)",
+                "[%s] Compliance check decision: %s (Sim: %.2f, Bayes: %.2f)",
                 run_id,
                 compliance_report.decision,
+                compliance_report.similarity_score,
                 compliance_report.bayes_p_bad,
             )
 
@@ -516,27 +527,32 @@ class YTAIMBotOrchestrator(object):
             audio_dir = data_dir / "audio"
             audio_dir.mkdir(parents=True, exist_ok=True)
             audio_path = audio_dir / f"{run_id}.mp3"
-            tts_adapter = build_tts_adapter()
-            if tts_adapter:
-                try:
-                    tts_adapter.speak(script.full_text, audio_path)
-                    result.audio_path = str(audio_path)
-                    logger.info("[%s] Audio synthesized: %s", run_id, audio_path)
-                except Exception as e:
-                    logger.warning("[%s] TTS failed (non-fatal): %s", run_id, e)
+            
+            if not script.full_text.strip():
+                logger.warning("[%s] Script is empty. Skipping TTS and Video Assembly.", run_id)
             else:
-                logger.info("[%s] TTS adapter not available — audio skipped", run_id)
+                tts_adapter = build_tts_adapter()
+                if tts_adapter:
+                    try:
+                        tts_adapter.speak(script.full_text, audio_path)
+                        result.audio_path = str(audio_path)
+                        logger.info("[%s] Audio synthesized: %s", run_id, audio_path)
+                    except Exception as e:
+                        logger.warning("[%s] TTS failed (non-fatal): %s", run_id, e)
+                else:
+                    logger.info("[%s] TTS adapter not available — audio skipped", run_id)
 
-
-            # 6. Video Assembly
-            video_asset = self.video_assembler.assemble_video(script)
-            result.videos.append(video_asset)
-            logger.info(
-                "[%s] Assembled video: %s (thumbnail: %s).",
-                run_id,
-                video_asset.video_path,
-                video_asset.thumbnail_path,
-            )
+                # 6. Video Assembly
+                if result.audio_path:
+                    audio_p = Path(result.audio_path)
+                    video_asset = self.video_assembler.assemble(script=script, audio_path=audio_p)
+                    result.videos.append(video_asset)
+                    logger.info(
+                        "[%s] Assembled video: %s (thumbnail: %s).",
+                        run_id,
+                        video_asset.video_path,
+                        video_asset.thumbnail_path,
+                    )
 
             # 7. Publishing
             if not self.dry_run:
