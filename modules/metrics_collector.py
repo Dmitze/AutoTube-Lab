@@ -24,7 +24,7 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Any
 
 from modules.adapters.retry import exponential_backoff # Corrected import
 from modules.adapters.errors import RetryableError # Corrected import
@@ -208,3 +208,67 @@ class MetricsCollector:
                 logger.warning("MetricsCollector: skipped %s: %s", v["video_id"], exc)
 
         return snapshots
+
+
+class MetricsScheduler:
+    """Schedules and runs daily metrics collection and weekly feedback updates (T-373, T-374).
+
+    Parameters
+    ----------
+    collector:
+        MetricsCollector instance for fetching YouTube data.
+    feedback_scorer:
+        Optional FeedbackScorer instance for updating niche weights.
+    """
+
+    def __init__(self, collector: MetricsCollector, feedback_scorer: Any = None) -> None:
+        self.collector = collector
+        self.feedback_scorer = feedback_scorer
+
+    def run_daily_metrics_collection(self) -> None:
+        """Daily job to fetch latest metrics for all published videos."""
+        logger.info("MetricsScheduler: Running daily metrics collection...")
+        self.collector.collect_all_pending()
+
+    def run_weekly_feedback_update(self) -> None:
+        """Weekly job to process latest metrics and update ML niche weights."""
+        logger.info("MetricsScheduler: Running weekly feedback update...")
+        if not self.feedback_scorer:
+            logger.warning("MetricsScheduler: No FeedbackScorer provided, skipping.")
+            return
+
+        storage = self.collector._storage
+        if not hasattr(storage, "list_published_videos") or not hasattr(storage, "get_top_videos"):
+            logger.warning("MetricsScheduler: Storage missing required methods.")
+            return
+
+        videos = storage.list_published_videos(limit=1000)
+        # We need the most recent metric for each video. 
+        # But get_top_videos or similar might be easier, or we can just query directly.
+        # For simplicity, we just use the latest metrics that get_top_videos fetches, or we simulate it.
+        # Since StorageAdapter doesn't have an exact get_metrics per video, 
+        # we can fetch all top videos by 'views' to get their latest metric snapshot
+        try:
+            latest_metrics_list = storage.get_top_videos(n=1000, metric="views")
+            metric_map = {row["video_id"]: row for row in latest_metrics_list}
+            
+            for v in videos:
+                vid = v["video_id"]
+                if vid in metric_map and "niche" in v:
+                    row = metric_map[vid]
+                    # Convert dict to MetricsSnapshot
+                    from ytaimbot_ml.schemas import MetricsSnapshot
+                    from datetime import datetime, timezone
+                    snapshot = MetricsSnapshot(
+                        video_id=vid,
+                        views=row.get("views", 0),
+                        ctr=row.get("ctr", 0.0),
+                        retention_30s=row.get("retention_30s", 0.0),
+                        rpm=row.get("rpm", 0.0),
+                        watch_time_h=row.get("watch_time_h", 0.0),
+                        collected_at=datetime.fromisoformat(row.get("collected_at", datetime.now(timezone.utc).isoformat()))
+                    )
+                    self.feedback_scorer.update(v["niche"], snapshot)
+            logger.info("MetricsScheduler: Finished weekly feedback update.")
+        except Exception as exc:
+            logger.error("MetricsScheduler: Failed weekly update: %s", exc)
