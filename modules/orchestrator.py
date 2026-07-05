@@ -400,8 +400,9 @@ class YTAIMBotOrchestrator(object):
     def dry_run(self) -> bool:
         """True if the pipeline is running in dry-run mode (no publishing)."""
         return (
-            os.getenv("DRY_RUN", "0").lower() == "1"
-            or os.getenv("YTAIMBOT_DRY_RUN", "0").lower() == "1"
+            str(self.config.get("YTAIMBOT_DRY_RUN", "0")).lower() in ("1", "true")
+            or str(self.config.get("DRY_RUN", "0")).lower() in ("1", "true")
+            or os.getenv("YTAIMBOT_DRY_RUN", "0").lower() in ("1", "true")
         )
 
     def run_pipeline(self, run_id: str) -> PipelineResult:
@@ -583,7 +584,7 @@ class YTAIMBotOrchestrator(object):
             if not self.dry_run:
                 due_job = self.upload_scheduler.next_due()
                 if due_job:
-                    due_video = VideoAsset(video_path=due_job.video_path, thumbnail_path=due_job.thumbnail_path)
+                    due_video = VideoAsset(plan_id=due_job.plan_id, video_path=due_job.video_path, thumbnail_path=due_job.thumbnail_path)
                     due_plan = ContentPlan(
                         trend_id=due_job.plan_id,
                         title=due_job.title,
@@ -591,7 +592,7 @@ class YTAIMBotOrchestrator(object):
                         keywords=due_job.tags
                     )
                     due_report = ComplianceReport(
-                        content_hash="mock", similarity_score=0.0, bayes_p_bad=0.0, decision="pass", flags=[]
+                        content_hash="mock", similarity_score=0.0, bayes_p_bad=0.0, decision="pass", reasons=[]
                     )
                     
                     if hasattr(self.publisher, "upload"):
@@ -607,13 +608,12 @@ class YTAIMBotOrchestrator(object):
                         if is_approved:
                             upload_result = UploadResult(
                                 plan_id=due_plan.trend_id, video_id="manual-approved", url="manual",
-                                privacy_status=PrivacyStatus.UNLISTED, quota_used=0, success=True
+                                privacy_status=PrivacyStatus.UNLISTED, quota_used=0
                             )
                         else:
                             upload_result = UploadResult(
                                 plan_id=due_plan.trend_id, video_id="", url="",
-                                privacy_status=PrivacyStatus.PRIVATE, quota_used=0, success=False,
-                                error_message="Manual review rejected"
+                                privacy_status=PrivacyStatus.PRIVATE, quota_used=0
                             )
 
                     result.uploads.append(upload_result)
