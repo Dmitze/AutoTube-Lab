@@ -29,7 +29,8 @@ def rl_pipeline(tmp_path):
     source._KEYWORDS[2] = "ai_stories"
     
     storage = InMemoryStorage()
-    storage.save_niche_arms(["ghibli_asmr", "hype_characters", "ai_stories"])
+    for arm in ["ghibli_asmr", "hype_characters", "ai_stories"]:
+        storage.upsert_niche_arm(arm, 0, 0.0, 0.0)
     publisher = StubPublisher()
     
     # Mock data dir
