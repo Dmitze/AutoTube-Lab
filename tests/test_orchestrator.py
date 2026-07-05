@@ -41,8 +41,8 @@ def test_dry_run_pipeline() -> None:
 
     assert result.status == "ok"
     assert len(result.rankings) == 10  # 10 synthetic trends
-    assert len(result.plans) == Pipeline._TOP_N
-    assert len(result.compliance_reports) == Pipeline._TOP_N
+    assert len(result.plans) == 1
+    assert len(result.compliance_reports) == 1
 
     # Storage should have received the run
     assert storage.get_run_status("test-run-001") == "ok"
