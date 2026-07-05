@@ -20,23 +20,13 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
+from ytaimbot_ml.schemas import UploadJob
+
 if TYPE_CHECKING:
     from ytaimbot_ml.schemas import ContentPlan, VideoAsset
     from modules.adapters.base import StorageAdapter
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(order=True)
-class UploadJob:
-    """Represents a video upload task in the queue."""
-    scheduled_at: float  # Unix timestamp
-    plan_id: str = field(compare=False)
-    video_path: str = field(compare=False)
-    thumbnail_path: Optional[str] = field(default=None, compare=False)
-    title: str = field(default="", compare=False)
-    description: str = field(default="", compare=False)
-    tags: List[str] = field(default_factory=list, compare=False)
 
 
 class UploadScheduler:
@@ -58,6 +48,8 @@ class UploadScheduler:
         self._heap: List[UploadJob] = []
         self._storage = storage
         self._max_per_day = max_per_day or int(os.environ.get("MAX_UPLOADS_PER_DAY", "1"))
+        self._uploads_today = 0
+        self._last_upload_date = None
         
         if self._storage:
             self._load_from_storage()
@@ -84,6 +76,14 @@ class UploadScheduler:
         Optional[UploadJob]
             The next job if its time has come, else None.
         """
+        current_date = datetime.datetime.fromtimestamp(time.time()).date()
+        if self._last_upload_date != current_date:
+            self._uploads_today = 0
+            self._last_upload_date = current_date
+            
+        if self._uploads_today >= self._max_per_day:
+            return None
+            
         if not self._heap:
             return None
         
@@ -92,34 +92,36 @@ class UploadScheduler:
             job = heapq.heappop(self._heap)
             if self._storage:
                 self._remove_from_storage(job)
+            self._uploads_today += 1
             return job
         
         return None
 
     def _load_from_storage(self) -> None:
         """Restore queue from persistent storage (T-299).  O(n log n)."""
-        # Note: Actual implementation depends on StorageAdapter API
-        # For now, we assume a generic 'load_queue' exists or stub it
+        if not self._storage:
+            return
         try:
-            # jobs = self._storage.load_upload_queue()
-            # for job in jobs:
-            #     heapq.heappush(self._heap, job)
-            pass
+            jobs = self._storage.load_upload_queue()
+            for job in jobs:
+                heapq.heappush(self._heap, job)
         except Exception as exc:
             logger.warning("Scheduler: failed to load queue from storage: %s", exc)
 
     def _save_to_storage(self, job: UploadJob) -> None:
         """Persist a new job to storage.  O(1) storage write."""
+        if not self._storage:
+            return
         try:
-            # self._storage.save_upload_job(job)
-            pass
+            self._storage.save_upload_job(job)
         except Exception as exc:
             logger.warning("Scheduler: failed to save job to storage: %s", exc)
 
     def _remove_from_storage(self, job: UploadJob) -> None:
         """Remove a completed job from storage.  O(1) storage delete."""
+        if not self._storage:
+            return
         try:
-            # self._storage.delete_upload_job(job.plan_id)
-            pass
+            self._storage.delete_upload_job(job.plan_id)
         except Exception as exc:
             logger.warning("Scheduler: failed to delete job from storage: %s", exc)
