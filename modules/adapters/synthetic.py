@@ -121,6 +121,12 @@ class InMemoryStorage(StorageAdapter):
     def save_metrics(self, metrics: MetricsSnapshot) -> None:
         self._metrics.append(metrics)
 
+    def load_metrics(self, video_id: str) -> MetricsSnapshot | None:
+        for m in reversed(self._metrics):
+            if m.video_id == video_id:
+                return m
+        return None
+
     def load_archive(self) -> dict[str, str]:
         return {r.content_hash: " ".join(r.reasons) for reports in self._compliance.values() for r in reports}
 
