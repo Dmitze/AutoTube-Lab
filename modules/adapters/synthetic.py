@@ -19,7 +19,10 @@ from ytaimbot_ml.schemas import (
     ComplianceReport,
     ContentPlan,
     MetricsSnapshot,
+    Script,
+    TrendRanking,
     TrendSignal,
+    UploadJob,
 )
 
 
@@ -165,6 +168,20 @@ class InMemoryStorage(StorageAdapter):
 
     def clear_ppo_transitions(self) -> None:
         self._ppo_transitions.clear()
+
+    def load_upload_queue(self) -> list[UploadJob]:
+        if not hasattr(self, "_upload_queue"):
+            self._upload_queue = {}
+        return list(self._upload_queue.values())
+
+    def save_upload_job(self, job: UploadJob) -> None:
+        if not hasattr(self, "_upload_queue"):
+            self._upload_queue = {}
+        self._upload_queue[job.plan_id] = job
+
+    def delete_upload_job(self, plan_id: str) -> None:
+        if hasattr(self, "_upload_queue"):
+            self._upload_queue.pop(plan_id, None)
 
     # --- Inspection helpers (not part of the ABC) ---
 
