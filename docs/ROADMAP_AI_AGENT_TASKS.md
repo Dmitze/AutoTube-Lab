@@ -1927,16 +1927,16 @@ class UploadScheduler:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-294 | 🔲 | Створити `UploadJob` dataclass | `src/ytaimbot_ml/schemas.py` | S | T-002 | — |
-| T-295 | 🔲 | Реалізувати `UploadScheduler` клас (min-heap) | `modules/scheduler.py` | L | T-294 | — |
-| T-296 | 🔲 | Реалізувати `schedule(job, at)` → None (O(log n) push) | `modules/scheduler.py` | M | T-295 | — |
-| T-297 | 🔲 | Реалізувати `next_due()` → UploadJob | None (O(1) peek) | `modules/scheduler.py` | M | T-295 | — |
-| T-298 | 🔲 | Реалізувати `MAX_UPLOADS_PER_DAY` ліміт (env var, default=1) | `modules/scheduler.py` | M | T-295 | — |
-| T-299 | 🔲 | Реалізувати persist queue у SQLite (відновлення після рестарту) | `modules/scheduler.py` | L | T-295 | — |
-| T-300 | 🔲 | Написати тести для UploadScheduler | `tests/test_scheduler.py` | M | T-295 | — |
-| T-301 | 🔲 | Тест: schedule + next_due → повертає job коли час прийшов | `tests/test_scheduler.py` | M | T-300 | — |
-| T-302 | 🔲 | Тест: MAX_UPLOADS_PER_DAY=1 → другий upload блокується | `tests/test_scheduler.py` | M | T-300 | — |
-| T-303 | 🔲 | Тест: queue відновлюється після перезапуску (persist) | `tests/test_scheduler.py` | L | T-300 | — |
+| T-294 | ✅ | Створити `UploadJob` dataclass | `src/ytaimbot_ml/schemas.py` | S | T-002 | 2026-07-05 |
+| T-295 | ✅ | Реалізувати `UploadScheduler` клас (min-heap) | `modules/scheduler.py` | L | T-294 | 2026-07-05 |
+| T-296 | ✅ | Реалізувати `schedule(job, at)` → None (O(log n) push) | `modules/scheduler.py` | M | T-295 | 2026-07-05 |
+| T-297 | ✅ | Реалізувати `next_due()` → UploadJob | None (O(1) peek) | `modules/scheduler.py` | M | T-295 | 2026-07-05 |
+| T-298 | ✅ | Реалізувати `MAX_UPLOADS_PER_DAY` ліміт (env var, default=1) | `modules/scheduler.py` | M | T-295 | 2026-07-05 |
+| T-299 | ✅ | Реалізувати persist queue у SQLite (відновлення після рестарту) | `modules/scheduler.py` | L | T-295 | 2026-07-05 |
+| T-300 | ✅ | Написати тести для UploadScheduler | `tests/unit/test_scheduler.py` | M | T-295 | 2026-07-05 |
+| T-301 | ✅ | Тест: schedule + next_due → повертає job коли час прийшов | `tests/unit/test_scheduler.py` | M | T-300 | 2026-07-05 |
+| T-302 | ✅ | Тест: MAX_UPLOADS_PER_DAY=1 → другий upload блокується | `tests/unit/test_scheduler.py` | M | T-300 | 2026-07-05 |
+| T-303 | ✅ | Тест: queue відновлюється після перезапуску (persist) | `tests/unit/test_scheduler.py` | L | T-300 | 2026-07-05 |
 
 ---
 
@@ -1949,10 +1949,10 @@ class UploadScheduler:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-304 | 🔲 | Розширити `PipelineResult` полями video_id, published_at, audit_entry | `src/ytaimbot_ml/schemas.py` | S | T-226 | — |
-| T-305 | 🔲 | Інтегрувати SimilarityGate у Pipeline (Stage перед Bayes) | `modules/orchestrator.py` | M | T-275 | — |
+| T-304 | ✅ | Розширити `PipelineResult` полями video_id, published_at, audit_entry | `src/ytaimbot_ml/schemas.py` | S | T-226 | 2026-07-05 |
+| T-305 | ✅ | Інтегрувати SimilarityGate у Pipeline (Stage перед Bayes) | `modules/orchestrator.py` | M | T-275 | 2026-07-05 |
 | T-306 | ✅ | Інтегрувати ManualReviewCLI у Pipeline (після Gate) | `modules/orchestrator.py` | M | T-286 | 2026-06-26 |
-| T-307 | 🔲 | Інтегрувати UploadScheduler у Pipeline | `modules/orchestrator.py` | M | T-297 | — |
+| T-307 | ✅ | Інтегрувати UploadScheduler у Pipeline | `modules/orchestrator.py` | M | T-297 | 2026-07-05 |
 | T-308 | 🔲 | Додати `MAX_UPLOADS_PER_DAY`, `YOUTUBE_CLIENT_SECRET_PATH` до .env.example | `.env.example` | S | T-295, T-263 | — |
 | T-309 | 🔲 | Написати E2E тест: повний pipeline від trend до published (всі mock) | `tests/test_e2e_pipeline.py` | XL | T-304, T-306 | — |
 | T-310 | 🔲 | Запустити `pytest -q --tb=short` → всі зелені | CI | S | T-309 | — |
