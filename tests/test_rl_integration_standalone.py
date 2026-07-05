@@ -147,7 +147,6 @@ def test_linear_ppo_update_returns_loss():
             state=state,
             action_idx=action_idx,
             reward=rng.uniform(0.0, 1.0),
-            next_state=next_state,
             prob=prob,
         ))
 
