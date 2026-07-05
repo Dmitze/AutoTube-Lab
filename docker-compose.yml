@@ -36,9 +36,11 @@ services:
       # Phase 3: Stock footage (T-073)
       - PEXELS_API_KEY=${PEXELS_API_KEY:-}
       - PIXABAY_API_KEY=${PIXABAY_API_KEY:-}
-      # Phase 5: YouTube publishing
+      # Phase 5: YouTube publishing & Metrics
       - YOUTUBE_CLIENT_SECRET_PATH=${YOUTUBE_CLIENT_SECRET_PATH:-data/client_secret.json}
       - MAX_UPLOADS_PER_DAY=${MAX_UPLOADS_PER_DAY:-1}
+      - METRICS_COLLECTION_DELAY_HOURS=${METRICS_COLLECTION_DELAY_HOURS:-48}
+      - FEEDBACK_ALPHA=${FEEDBACK_ALPHA:-0.3}
       # Monitoring
       - PROMETHEUS_PORT=${PROMETHEUS_PORT:-8000}
       - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
