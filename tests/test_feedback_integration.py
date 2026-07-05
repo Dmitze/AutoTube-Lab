@@ -19,7 +19,8 @@ def test_feedback_scorer_ema_updates_weights():
     """T-377: FeedbackScorer updates niche weights via EMA after metrics."""
     from src.ytaimbot_ml.feedback.scorer import FeedbackScorer
 
-    scorer = FeedbackScorer(alpha=0.3)
+    storage = InMemoryStorage()
+    scorer = FeedbackScorer(storage=storage, alpha=0.3)
 
     # Simulate high-performing finance niche
     finance_metrics = MetricsSnapshot(
@@ -41,7 +42,8 @@ def test_feedback_scorer_safety_bounds():
     """T-377: Safety bounds prevent weight from changing more than 20%."""
     from src.ytaimbot_ml.feedback.scorer import FeedbackScorer
 
-    scorer = FeedbackScorer(alpha=0.3)
+    storage = InMemoryStorage()
+    scorer = FeedbackScorer(storage=storage, alpha=0.3)
     initial = 1.0
 
     # Extreme metrics (very high performance)
@@ -66,7 +68,8 @@ def test_top_niches_get_higher_weight_after_iterations():
     """T-378: After 10 iterations, high-RPM niche has higher weight than low-RPM."""
     from src.ytaimbot_ml.feedback.scorer import FeedbackScorer
 
-    scorer = FeedbackScorer(alpha=0.3)
+    storage = InMemoryStorage()
+    scorer = FeedbackScorer(storage=storage, alpha=0.3)
 
     high_rpm = MetricsSnapshot(
         video_id="h", views=10000, ctr=0.08, retention_30s=0.75, rpm=15.0
@@ -97,6 +100,7 @@ def test_env_vars_have_defaults(monkeypatch):
 
     assert delay == 48
     assert alpha == pytest.approx(0.3)
+
 
 
 # ---------------------------------------------------------------------------
