@@ -83,7 +83,8 @@ class TrendAnalyzer:
         return [TrendRanking(trend_id=tid, score=float(score)) for tid, score in ranked]
 
     def analyze(
-        self, signals: list[TrendSignal], n_components: int = 2
+        self, signals: list[TrendSignal], n_components: int = 2,
+        feedback_scorer=None
     ) -> list[TrendRanking]:
         """Full pipeline: featurize → reduce → score.
 
@@ -95,6 +96,8 @@ class TrendAnalyzer:
             Raw trend signals to analyse.
         n_components:
             Number of PCA components to retain.
+        feedback_scorer:
+            Optional FeedbackScorer to adjust weights based on metrics.
 
         Returns
         -------
@@ -109,10 +112,23 @@ class TrendAnalyzer:
 
         if feature_matrix.shape[1] <= n_components:
             # Not enough features to reduce — fall back to raw magnitude ranking
-            return self.score_trends(feature_matrix, trend_ids)
+            rankings = self.score_trends(feature_matrix, trend_ids)
+        else:
+            reduced = self.fit_transform(feature_matrix, n_components)
+            rankings = self.score_trends(reduced, trend_ids)
 
-        reduced = self.fit_transform(feature_matrix, n_components)
-        return self.score_trends(reduced, trend_ids)
+        if feedback_scorer is not None:
+            weights = feedback_scorer.get_weights()
+            signal_map = {s.trend_id: s.keyword for s in signals}
+            for rank in rankings:
+                niche = signal_map.get(rank.trend_id, "")
+                weight = weights.get(niche, 1.0)
+                rank.score *= weight
+            
+            # Re-sort after weighting
+            rankings.sort(key=lambda x: x.score, reverse=True)
+
+        return rankings
 
     # ------------------------------------------------------------------
     # Private helpers
