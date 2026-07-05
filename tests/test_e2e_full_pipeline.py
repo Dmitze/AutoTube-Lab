@@ -66,6 +66,13 @@ def test_e2e_full_pipeline_dry_run():
         seed=42,
     )
 
+    pipeline.orchestrator.script_generator = MagicMock()
+    pipeline.orchestrator.script_generator.generate_script.return_value = _make_script()
+    pipeline.orchestrator.tts_adapter = MagicMock()
+    pipeline.orchestrator.tts_adapter.generate_audio.return_value = "fake.mp3"
+    pipeline.orchestrator.video_assembler = MagicMock()
+    pipeline.orchestrator.video_assembler.assemble.return_value = VideoAsset(plan_id="1", video_path="fake.mp4", thumbnail_path="fake.png")
+
     result = pipeline.run(run_id="e2e-dry-run-001")
 
     assert result.status == "ok"
@@ -115,6 +122,13 @@ def test_e2e_pipeline_non_dry_run_calls_publisher():
         seed=42,
     )
 
+    pipeline.orchestrator.script_generator = MagicMock()
+    pipeline.orchestrator.script_generator.generate_script.return_value = _make_script()
+    pipeline.orchestrator.tts_adapter = MagicMock()
+    pipeline.orchestrator.tts_adapter.generate_audio.return_value = "fake.mp3"
+    pipeline.orchestrator.video_assembler = MagicMock()
+    pipeline.orchestrator.video_assembler.assemble.return_value = VideoAsset(plan_id="1", video_path="fake.mp4", thumbnail_path="fake.png")
+
     result = pipeline.run(run_id="e2e-publish-001")
 
     assert result.status == "ok"
@@ -133,13 +147,13 @@ def test_e2e_pipeline_blocked_when_all_fail_gate():
 
     # Use a compliance checker that always fails
     class AlwaysFailChecker:
-        def check(self, script):
-            return ComplianceReport(
+        def check(self, script_text, archive=None):
+            from ytaimbot_ml.quality.similarity_gate import SimilarityReport
+            return SimilarityReport(
                 content_hash="fail",
-                similarity_score=0.99,
-                bayes_p_bad=0.99,
+                score=0.99,
                 decision="fail",
-                reasons=["always fail"],
+                matches=[]
             )
 
         def max_similarity(self, *args, **kwargs):
@@ -152,6 +166,12 @@ def test_e2e_pipeline_blocked_when_all_fail_gate():
         dry_run=True,
         seed=42,
     )
+    pipeline.orchestrator.script_generator = MagicMock()
+    pipeline.orchestrator.script_generator.generate_script.return_value = _make_script()
+    pipeline.orchestrator.tts_adapter = MagicMock()
+    pipeline.orchestrator.tts_adapter.generate_audio.return_value = "fake.mp3"
+    pipeline.orchestrator.video_assembler = MagicMock()
+    pipeline.orchestrator.video_assembler.assemble.return_value = VideoAsset(plan_id="1", video_path="fake.mp4", thumbnail_path="fake.png")
     # Override compliance checker
     pipeline.orchestrator.compliance_checker = AlwaysFailChecker()
 
