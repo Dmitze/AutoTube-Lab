@@ -93,7 +93,7 @@ def test_pipeline_result_stores_paths_after_run(tmp_path):
         from modules.adapters.storage.sqlite import SQLiteStorage
 
         storage = SQLiteStorage(db_path=tmp_path / "test.db")
-        source = SyntheticTrendSource(seed=42, count=5)
+        source = SyntheticTrendSource(seed=42)
 
         # Patch publisher
         from modules.adapters.synthetic import StubPublisher
