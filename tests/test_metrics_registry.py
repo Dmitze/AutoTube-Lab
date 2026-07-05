@@ -10,7 +10,7 @@ import pytest
 
 def test_metrics_registry_record_run_ok():
     """T-461: record_run('ok') increments the ok counter."""
-    from src.ytaimbot_ml.utils.metrics import MetricsRegistry
+    from ytaimbot_ml.utils.metrics import MetricsRegistry
     registry = MetricsRegistry()
     registry.record_run("ok")
     assert registry._run_counts.get("ok", 0) >= 1
@@ -18,7 +18,7 @@ def test_metrics_registry_record_run_ok():
 
 def test_metrics_registry_record_run_error():
     """T-461: record_run('error') increments the error counter."""
-    from src.ytaimbot_ml.utils.metrics import MetricsRegistry
+    from ytaimbot_ml.utils.metrics import MetricsRegistry
     registry = MetricsRegistry()
     registry.record_run("error")
     assert registry._run_counts.get("error", 0) >= 1
@@ -26,7 +26,7 @@ def test_metrics_registry_record_run_error():
 
 def test_metrics_registry_observe_duration():
     """T-461: observe_duration() records pipeline execution time."""
-    from src.ytaimbot_ml.utils.metrics import MetricsRegistry
+    from ytaimbot_ml.utils.metrics import MetricsRegistry
     registry = MetricsRegistry()
     registry.observe_duration(42.5)
     assert len(registry._durations) >= 1
@@ -39,7 +39,7 @@ def test_metrics_registry_observe_duration():
 
 def test_metrics_registry_record_publish_error():
     """T-462: record_publish_error('compliance') increments error counter."""
-    from src.ytaimbot_ml.utils.metrics import MetricsRegistry
+    from ytaimbot_ml.utils.metrics import MetricsRegistry
     registry = MetricsRegistry()
     registry.record_publish_error("compliance")
     assert registry._publish_errors.get("compliance", 0) >= 1
@@ -47,7 +47,7 @@ def test_metrics_registry_record_publish_error():
 
 def test_metrics_registry_multiple_runs():
     """T-461: Multiple runs are counted correctly."""
-    from src.ytaimbot_ml.utils.metrics import MetricsRegistry
+    from ytaimbot_ml.utils.metrics import MetricsRegistry
     registry = MetricsRegistry()
     for _ in range(5):
         registry.record_run("ok")
@@ -59,7 +59,7 @@ def test_metrics_registry_multiple_runs():
 
 def test_metrics_registry_summary():
     """T-461: summary() returns dict with all metric categories."""
-    from src.ytaimbot_ml.utils.metrics import MetricsRegistry
+    from ytaimbot_ml.utils.metrics import MetricsRegistry
     registry = MetricsRegistry()
     registry.record_run("ok")
     registry.observe_duration(10.0)
