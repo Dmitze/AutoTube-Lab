@@ -43,6 +43,7 @@ from ytaimbot_ml.schemas import (
     ChannelStats,
     ComplianceReport,
     TrendSignal,
+    UploadJob,
 )
 
 _log = logging.getLogger(__name__)
@@ -150,6 +151,16 @@ CREATE TABLE IF NOT EXISTS ppo_transitions (
     action_idx   INTEGER NOT NULL,
     prob         REAL NOT NULL,
     created_at   REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS upload_queue (
+    plan_id        TEXT PRIMARY KEY,
+    scheduled_at   REAL NOT NULL,
+    video_path     TEXT NOT NULL,
+    thumbnail_path TEXT,
+    title          TEXT NOT NULL,
+    description    TEXT NOT NULL,
+    tags_json      TEXT NOT NULL
 );
 """
 
@@ -871,6 +882,72 @@ class SQLiteStorage(StorageAdapter):
         except sqlite3.Error:
             _log.exception("load_niche_arms failed")
             raise
+
+    def load_upload_queue(self) -> list[UploadJob]:
+        """Load pending upload jobs from persistent storage.
+        
+        Complexity: O(n) where n is queue size.
+        """
+        try:
+            cur = self._conn.execute("SELECT * FROM upload_queue ORDER BY scheduled_at ASC")
+            jobs = []
+            for row in cur.fetchall():
+                d = dict(row)
+                jobs.append(UploadJob(
+                    scheduled_at=d["scheduled_at"],
+                    plan_id=d["plan_id"],
+                    video_path=d["video_path"],
+                    thumbnail_path=d["thumbnail_path"],
+                    title=d["title"],
+                    description=d["description"],
+                    tags=json.loads(d["tags_json"]),
+                ))
+            return jobs
+        except sqlite3.Error:
+            _log.exception("load_upload_queue failed")
+            return []
+
+    def save_upload_job(self, job: UploadJob) -> None:
+        """Save a pending upload job to storage.
+        
+        Complexity: O(log n).
+        """
+        try:
+            with self._lock:
+                with self._conn:
+                    self._conn.execute(
+                        """
+                        INSERT OR REPLACE INTO upload_queue
+                            (plan_id, scheduled_at, video_path, thumbnail_path, title, description, tags_json)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            job.plan_id,
+                            job.scheduled_at,
+                            job.video_path,
+                            job.thumbnail_path,
+                            job.title,
+                            job.description,
+                            json.dumps(job.tags),
+                        ),
+                    )
+        except sqlite3.Error:
+            _log.exception("save_upload_job failed for plan_id=%s", job.plan_id)
+            raise
+
+    def delete_upload_job(self, plan_id: str) -> None:
+        """Delete an upload job from storage by plan_id.
+        
+        Complexity: O(log n).
+        """
+        try:
+            with self._lock:
+                with self._conn:
+                    self._conn.execute("DELETE FROM upload_queue WHERE plan_id = ?", (plan_id,))
+        except sqlite3.Error:
+            _log.exception("delete_upload_job failed for plan_id=%s", plan_id)
+            raise
+
 
     def save_ppo_transition(
         self, video_id: str, state: list[float], action_idx: int, prob: float
