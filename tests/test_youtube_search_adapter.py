@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import os
+import certifi
+os.environ["HTTPLIB2_CA_CERTS"] = certifi.where()
+
 from unittest.mock import MagicMock, patch
 
 import pytest
