@@ -142,6 +142,7 @@ class ManualReviewPublisher(PublisherAdapter):
             decision="pass",
             score=getattr(compliance_report, "similarity_score", 0.0),
             content_hash=getattr(compliance_report, "content_hash", ""),
+            matches=[],
         )
         compliance_score = getattr(compliance_report, "score", 0.0)
         upload_count = 0  # will be overridden when storage is wired
