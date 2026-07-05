@@ -1953,18 +1953,18 @@ class UploadScheduler:
 | T-305 | ✅ | Інтегрувати SimilarityGate у Pipeline (Stage перед Bayes) | `modules/orchestrator.py` | M | T-275 | 2026-07-05 |
 | T-306 | ✅ | Інтегрувати ManualReviewCLI у Pipeline (після Gate) | `modules/orchestrator.py` | M | T-286 | 2026-06-26 |
 | T-307 | ✅ | Інтегрувати UploadScheduler у Pipeline | `modules/orchestrator.py` | M | T-297 | 2026-07-05 |
-| T-308 | 🔲 | Додати `MAX_UPLOADS_PER_DAY`, `YOUTUBE_CLIENT_SECRET_PATH` до .env.example | `.env.example` | S | T-295, T-263 | — |
-| T-309 | 🔲 | Написати E2E тест: повний pipeline від trend до published (всі mock) | `tests/test_e2e_pipeline.py` | XL | T-304, T-306 | — |
-| T-310 | 🔲 | Запустити `pytest -q --tb=short` → всі зелені | CI | S | T-309 | — |
+| T-308 | ✅ | Додати `MAX_UPLOADS_PER_DAY`, `YOUTUBE_CLIENT_SECRET_PATH` до .env.example | `.env.example` | S | T-295, T-263 | — |
+| T-309 | ✅ | Написати E2E тест: повний pipeline від trend до published (всі mock) | `tests/test_e2e_pipeline.py` | XL | T-304, T-306 | — |
+| T-310 | ✅ | Запустити `pytest -q --tb=short` → всі зелені | CI | S | T-309 | — |
 
 **Acceptance для PHASE 4 (загалом):**
-- [ ] Перші 50 відео → UNLISTED + Manual Review
-- [ ] AI disclosure у кожному відео обов'язковий
-- [ ] SimilarityGate + BayesGate — обидва повинні пройти перед publish
-- [ ] AuditLog: кожне рішення записано у JSON Lines
-- [ ] Token Bucket: max 1 upload / 6 хвилин
-- [ ] E2E тест: повний pipeline з усіма моками → зелений
-- [ ] Dry-run: YTAIMBOT_DRY_RUN=true → жодного реального upload
+- [x] Перші 50 відео → UNLISTED + Manual Review
+- [x] AI disclosure у кожному відео обов'язковий
+- [x] SimilarityGate + BayesGate — обидва повинні пройти перед publish
+- [x] AuditLog: кожне рішення записано у JSON Lines
+- [x] Token Bucket: max 1 upload / 6 хвилин
+- [x] E2E тест: повний pipeline з усіма моками → зелений
+- [x] Dry-run: YTAIMBOT_DRY_RUN=true → жодного реального upload
 
 ---
 
@@ -2244,10 +2244,10 @@ def ascii_bar(value: float, max_val: float, width: int = 30) -> str:
 | T-365 | ✅ | Реалізувати `ascii_bar(value, max_val, width=30)` → str | `modules/reporting/weekly_report.py` | S | T-361 | 2026-06-26 |
 | T-366 | ✅ | Реалізувати `_recommendations()` → list[str] (на основі даних) | `modules/reporting/weekly_report.py` | M | T-361 | 2026-06-26 |
 | T-367 | ✅ | Зберігати звіт у `docs/WEEKLY_REPORTS/YYYY-WNN.md` | `modules/reporting/weekly_report.py` | S | T-362 | 2026-06-26 |
-| T-368 | 🔲 | Написати тести для WeeklyReportGenerator | `tests/test_weekly_report.py` | M | T-361 | — |
-| T-369 | 🔲 | Тест: generate() повертає непорожній markdown string | `tests/test_weekly_report.py` | S | T-368 | — |
-| T-370 | 🔲 | Тест: звіт містить секції top/bottom/recommendations | `tests/test_weekly_report.py` | M | T-368 | — |
-| T-371 | 🔲 | Тест: ascii_bar — заповненість пропорційна value/max_val | `tests/test_weekly_report.py` | S | T-368 | — |
+| T-368 | ✅ | Написати тести для WeeklyReportGenerator | `tests/test_weekly_report.py` | M | T-361 | 2026-06-26 |
+| T-369 | ✅ | Тест: generate() повертає непорожній markdown string | `tests/test_weekly_report.py` | S | T-368 | 2026-06-26 |
+| T-370 | ✅ | Тест: звіт містить секції top/bottom/recommendations | `tests/test_weekly_report.py` | M | T-368 | 2026-06-26 |
+| T-371 | ✅ | Тест: ascii_bar — заповненість пропорційна value/max_val | `tests/test_weekly_report.py` | S | T-368 | 2026-06-26 |
 
 ---
 
@@ -2259,13 +2259,13 @@ def ascii_bar(value: float, max_val: float, width: int = 30) -> str:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-372 | 🔲 | Інтегрувати FeedbackScorer у TrendAnalyzer (weighted scoring) | `src/ytaimbot_ml/trend_analyzer.py` | L | T-343, T-003 | — |
-| T-373 | 🔲 | Реалізувати daily metrics collection job (scheduler) | `modules/metrics_collector.py` | M | T-330, T-299 | — |
-| T-374 | 🔲 | Реалізувати weekly feedback update job | `modules/metrics_collector.py` | M | T-340, T-373 | — |
-| T-375 | 🔲 | Додати `METRICS_COLLECTION_DELAY_HOURS`, `FEEDBACK_ALPHA` до .env.example | `.env.example` | S | T-329, T-340 | — |
-| T-376 | 🔲 | Оновити docker-compose.yml з новими env vars | `docker-compose.yml` | S | T-375 | — |
-| T-377 | 🔲 | Написати інтеграційний тест: collect → score → analyze → report | `tests/test_feedback_integration.py` | L | T-372, T-374 | — |
-| T-378 | 🔲 | Тест: після 10 ітерацій — топ niches отримують вищий weight | `tests/test_feedback_integration.py` | L | T-377 | — |
+| T-372 | ✅ | Інтегрувати FeedbackScorer у TrendAnalyzer (weighted scoring) | `src/ytaimbot_ml/trend_analyzer.py` | L | T-343, T-003 | 2026-07-05 |
+| T-373 | ✅ | Реалізувати daily metrics collection job (scheduler) | `modules/metrics_collector.py` | M | T-330, T-299 | 2026-07-05 |
+| T-374 | ✅ | Реалізувати weekly feedback update job | `modules/metrics_collector.py` | M | T-340, T-373 | 2026-07-05 |
+| T-375 | ✅ | Додати `METRICS_COLLECTION_DELAY_HOURS`, `FEEDBACK_ALPHA` до .env.example | `.env.example` | S | T-329, T-340 | 2026-07-05 |
+| T-376 | ✅ | Оновити docker-compose.yml з новими env vars | `docker-compose.yml` | S | T-375 | 2026-07-05 |
+| T-377 | ✅ | Написати інтеграційний тест: collect → score → analyze → report | `tests/test_feedback_integration.py` | L | T-372, T-374 | 2026-07-05 |
+| T-378 | ✅ | Тест: після 10 ітерацій — топ niches отримують вищий weight | `tests/test_feedback_integration.py` | L | T-377 | 2026-07-05 |
 | T-379 | 🔲 | Запустити `pytest -q --tb=short` → всі зелені | CI | S | T-378 | — |
 | T-380 | 🔲 | Перевірити coverage ≥ 80% для всіх нових модулів Phase 5 | CI | S | T-379 | — |
 
