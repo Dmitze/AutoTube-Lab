@@ -413,3 +413,13 @@ class PipelineResult:
     audit_entry: dict | None = None      # AuditLog entry for this run
 
 
+@dataclass(order=True)
+class UploadJob:
+    """Represents a video upload task in the queue."""
+    scheduled_at: float  # Unix timestamp
+    plan_id: str = field(compare=False)
+    video_path: str = field(compare=False)
+    thumbnail_path: str | None = field(default=None, compare=False)
+    title: str = field(default="", compare=False)
+    description: str = field(default="", compare=False)
+    tags: list[str] = field(default_factory=list, compare=False)
