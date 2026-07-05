@@ -26,49 +26,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_AUDIT_LOG = Path("data/audit_log.jsonl")
-
-
-@dataclass
-class AuditEntry:
-    """Record of a manual or automatic review decision."""
-    timestamp: str
-    video_id: str
-    title: str
-    operator: Literal["human", "ai_agent"]
-    decision: Literal["approve", "reject"]
-    compliance_score: float
-    similarity_score: float
-    content_hash: str
-    reason: str = ""
-
-
-class AuditLog:
-    """Append-only storage for review decisions using JSON Lines format.
-
-    Complexity: O(1) write, O(n) read.
-    """
-
-    def __init__(self, path: str | Path | None = None) -> None:
-        self.path = Path(path) if path else _DEFAULT_AUDIT_LOG
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-
-    def append(self, entry: AuditEntry) -> None:
-        """Add an entry to the log file.  O(1)."""
-        with open(self.path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(asdict(entry), ensure_ascii=False) + "\n")
-
-    def read_all(self) -> List[AuditEntry]:
-        """Read all entries from the log.  O(n)."""
-        if not self.path.exists():
-            return []
-        
-        entries = []
-        with open(self.path, "r", encoding="utf-8") as f:
-            for line in f:
-                if line.strip():
-                    entries.append(AuditEntry(**json.loads(line)))
-        return entries
+from modules.dashboard.audit_log import AuditEntry, AuditLog
 
 
 class ManualReviewCLI:
@@ -86,9 +44,14 @@ class ManualReviewCLI:
         self,
         audit_log: AuditLog | None = None,
         upload_threshold: int = 50,
+        manual_quota: int = 50,
+        input_fn=input,
+        output_fn=print,
     ) -> None:
         self.audit_log = audit_log or AuditLog()
-        self.threshold = upload_threshold
+        self.threshold = manual_quota if manual_quota != 50 else upload_threshold
+        self.input_fn = input_fn
+        self.output_fn = output_fn
 
     def review(
         self,
@@ -124,33 +87,44 @@ class ManualReviewCLI:
             return "approve"
 
         # Display dashboard (T-287)
-        print("\n" + "=" * 60)
-        print(f" 📺 CONTENT REVIEW (Upload #{upload_count + 1})")
-        print("=" * 60)
-        print(f" Title:      {plan.title}")
-        print(f" Trend ID:   {plan.trend_id}")
-        print(f" Keywords:   {', '.join(plan.keywords[:5])}")
-        print("-" * 60)
-        print(f" Quality (Bayes): {compliance_score:.2f}")
-        print(f" Similarity:      {similarity.score:.2f} ({similarity.decision})")
-        print(f" Content Hash:    {similarity.content_hash[:16]}...")
-        print("=" * 60)
+        self.output_fn("\n" + "=" * 60)
+        self.output_fn(f" 📺 CONTENT REVIEW (Upload #{upload_count + 1})")
+        self.output_fn("=" * 60)
+        self.output_fn(f" Title:      {plan.title}")
+        self.output_fn(f" Trend ID:   {plan.trend_id}")
+        self.output_fn(f" Keywords:   {', '.join(plan.keywords[:5])}")
+        self.output_fn("-" * 60)
+        self.output_fn(f" Quality (Bayes): {compliance_score:.2f}")
+        sim_score = getattr(similarity, "score", getattr(similarity, "similarity_score", 0.0))
+        self.output_fn(f" Similarity:      {sim_score:.2f} ({similarity.decision})")
+        self.output_fn(f" Content Hash:    {similarity.content_hash[:16]}...")
+        self.output_fn("=" * 60)
 
         # Interaction (T-286)
         while True:
-            choice = input("\n[A]pprove | [R]eject | [Q]uit: ").lower().strip()
+            choice = ""
+            try:
+                choice = self.input_fn("\n[A]pprove | [R]eject | [Q]uit: ").lower().strip()
+            except EOFError:
+                self._log_decision(plan, similarity, compliance_score, "human", "reject", "EOF")
+                return "reject"
+                
             if choice == "a":
                 self._log_decision(plan, similarity, compliance_score, "human", "approve")
                 return "approve"
             elif choice == "r":
-                reason = input("Reason for rejection: ")
+                reason = ""
+                try:
+                    reason = self.input_fn("Reason for rejection: ")
+                except EOFError:
+                    pass
                 self._log_decision(plan, similarity, compliance_score, "human", "reject", reason)
                 return "reject"
             elif choice == "q":
                 logger.info("ManualReviewCLI: user quit")
                 raise KeyboardInterrupt()
             else:
-                print("Invalid choice, please enter 'a', 'r', or 'q'.")
+                self.output_fn("Invalid choice, please enter 'a', 'r', or 'q'.")
 
     def _log_decision(
         self,
@@ -163,14 +137,10 @@ class ManualReviewCLI:
     ) -> None:
         """Helper to append a decision to the audit log."""
         entry = AuditEntry(
-            timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            video_id=plan.trend_id,  # Use trend_id as temporary ID
-            title=plan.title,
-            operator=operator,
+            run_id=plan.trend_id,  # Run ID not available here, so we use trend_id as fallback
+            trend_id=plan.trend_id,
             decision=decision,
-            compliance_score=compliance_score,
-            similarity_score=similarity.score,
-            content_hash=similarity.content_hash,
             reason=reason,
+            operator=operator,
         )
         self.audit_log.append(entry)
