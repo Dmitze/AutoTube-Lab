@@ -29,6 +29,7 @@ def rl_pipeline(tmp_path):
     source._KEYWORDS[2] = "ai_stories"
     
     storage = InMemoryStorage()
+    storage.save_niche_arms(["ghibli_asmr", "hype_characters", "ai_stories"])
     publisher = StubPublisher()
     
     # Mock data dir
@@ -50,7 +51,7 @@ def test_rl_niche_selection_and_feedback(rl_pipeline):
     pipeline, storage, _ = rl_pipeline
     
     # 1. First run: should select first niche (cold start)
-    niche1 = pipeline._bandit.select()
+    niche1 = pipeline.orchestrator.niche_bandit.select()
     result1 = pipeline.run(run_id="run-1")
     assert result1.status == "ok"
     
@@ -67,7 +68,7 @@ def test_rl_niche_selection_and_feedback(rl_pipeline):
     assert result2.status == "ok"
     
     # Check that bandit was updated
-    stats = pipeline._bandit.stats["ghibli_asmr"]
+    stats = pipeline.orchestrator.niche_bandit.stats["ghibli_asmr"]
     # Depending on how many videos were "published" in run-1
     # In our stub, all approved plans are published. Pipeline._TOP_N = 5.
     assert stats.n_pulls > 0
@@ -92,7 +93,7 @@ def test_ppo_transition_and_update(rl_pipeline):
     storage.save_metrics(snapshot)
     
     # 3. Run feedback loop directly to trigger PPO update
-    pipeline._feedback_loop()
+    pipeline.orchestrator.update_metrics()
     
     # Transitions should be cleared after update
     assert len(storage.load_ppo_transitions()) == 0
@@ -113,12 +114,12 @@ def test_drift_detection_resets_bandit(rl_pipeline):
         storage.save_metrics(snapshot)
         
     # Set high pulls to verify reset
-    pipeline._bandit.update("ghibli_asmr", 0.5)
-    assert pipeline._bandit.total_pulls > 0
+    pipeline.orchestrator.niche_bandit.update("ghibli_asmr", 0.5)
+    assert pipeline.orchestrator.niche_bandit.total_pulls > 0
     
     # 2. Run pipeline: feedback loop should detect drift
-    pipeline._drift_detector.threshold = 0.0001 # Force drift detection
+    pipeline.orchestrator.drift_detector.threshold = 0.0001 # Force drift detection
     pipeline.run(run_id="run-drift")
     
     # Bandit should be reset
-    assert pipeline._bandit.total_pulls == 0
+    assert pipeline.orchestrator.niche_bandit.total_pulls == 0
