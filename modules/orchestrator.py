@@ -24,17 +24,23 @@ from modules.adapters.tts import build_tts_adapter
 from modules.adapters.video import create_video_backend
 # from modules.metrics_collector import MetricsRegistry # Removed line
 from modules.adapters.retry import exponential_backoff # Modified line
+from ytaimbot_ml.learner.optimizer import Transition
 from ytaimbot_ml.quality import BayesQualityFilter, KSDriftDetector, SimilarityGate
 from ytaimbot_ml.rl import LinearPPO, RewardShaper, UCB1Bandit
 from ytaimbot_ml.schemas import (
+    ComplianceReport,
+    ContentPlan,
+    PipelineResult,
+    VideoAsset,
+    UploadJob,
+    UploadResult,
+    PrivacyStatus,
     ContentAction,
     ContentState,
-    PipelineResult,
     Script,
     TrendRanking,
-    MetricsSnapshot # Added
+    MetricsSnapshot,
 )
-# from ytaimbot_ml.seo import TrendAnalyzer # Removed
 from ytaimbot_ml.utils import make_rng
 from ytaimbot_ml.utils.metrics import MetricsRegistry # Added line
 from ytaimbot_ml.trend_analyzer import TrendAnalyzer # Added
@@ -331,6 +337,12 @@ class YTAIMBotOrchestrator(object):
         self.similarity_gate = SimilarityGate()
         self.reward_shaper = RewardShaper()
 
+        from modules.scheduler import UploadScheduler
+        self.upload_scheduler = UploadScheduler(
+            storage=self.storage,
+            max_per_day=int(os.environ.get("MAX_UPLOADS_PER_DAY", "6"))
+        )
+
         # UCB1 Bandit for niche selection (explore/exploit)
         raw_arms = self.storage.load_niche_arms()
         if raw_arms and isinstance(raw_arms[0], dict):
@@ -553,48 +565,93 @@ class YTAIMBotOrchestrator(object):
                         video_asset.video_path,
                         video_asset.thumbnail_path,
                     )
-
-            # 7. Publishing
-            if not self.dry_run:
-                upload_result = self.publisher.publish(content_plan, compliance_report)
-                result.uploads.append(upload_result)
-                if upload_result.success:
-                    self.storage.save_video(
-                        video_id=upload_result.video_id,
-                        trend_id=content_plan.trend_id,
+                    
+                    # Schedule job
+                    job = UploadJob(
+                        scheduled_at=time.time(),
+                        plan_id=content_plan.trend_id,
+                        video_path=video_asset.video_path,
+                        thumbnail_path=video_asset.thumbnail_path or "",
                         title=content_plan.title,
-                        privacy_status=upload_result.privacy_status,
+                        description=content_plan.outline[0] if content_plan.outline else "",
+                        tags=content_plan.keywords
                     )
-                    logger.info(
-                        "[%s] Published video: %s (URL: %s)",
-                        run_id,
-                        upload_result.video_id,
-                        upload_result.url,
-                    )
-                    # For PPO, calculate immediate reward based on preliminary metrics
-                    reward = self.reward_shaper.shape(
-                        views=0, # Initial views are 0
-                        ctr=0.0,
-                        retention_30s=0.0
-                    )
-                    # Find the stored PPO transition and update its reward
-                    for t in self.ppo_transitions:
-                        # Assuming video_id is used to link transition to actual video
-                        if np.array_equal(t.state, content_state): # Fixed match
-                            t.reward = reward
-                            break
-                    # Train PPO policy periodically
-                    if len(self.ppo_transitions) >= 10: # Example batch size
-                        self.ppo_policy.update(self.ppo_transitions) # Fixed method call
-                        self.storage.clear_ppo_transitions()
-                        self.ppo_transitions.clear()
+                    self.upload_scheduler.schedule(job)
+                    logger.info("[%s] Scheduled video for upload: %s", run_id, video_asset.video_path)
 
+            # 7. Publishing (process queue)
+            if not self.dry_run:
+                due_job = self.upload_scheduler.next_due()
+                if due_job:
+                    due_video = VideoAsset(video_path=due_job.video_path, thumbnail_path=due_job.thumbnail_path)
+                    due_plan = ContentPlan(
+                        trend_id=due_job.plan_id,
+                        title=due_job.title,
+                        outline=[due_job.description],
+                        keywords=due_job.tags
+                    )
+                    due_report = ComplianceReport(
+                        content_hash="mock", similarity_score=0.0, bayes_p_bad=0.0, decision="pass", flags=[]
+                    )
+                    
+                    if hasattr(self.publisher, "upload"):
+                        upload_result = self.publisher.upload(
+                            video_asset=due_video,
+                            plan=due_plan,
+                            compliance_report=due_report,
+                            description=due_job.description,
+                            tags=due_job.tags
+                        )
+                    else:
+                        is_approved = self.publisher.publish(due_plan, due_report)
+                        if is_approved:
+                            upload_result = UploadResult(
+                                plan_id=due_plan.trend_id, video_id="manual-approved", url="manual",
+                                privacy_status=PrivacyStatus.UNLISTED, quota_used=0, success=True
+                            )
+                        else:
+                            upload_result = UploadResult(
+                                plan_id=due_plan.trend_id, video_id="", url="",
+                                privacy_status=PrivacyStatus.PRIVATE, quota_used=0, success=False,
+                                error_message="Manual review rejected"
+                            )
 
-                else:
-                    logger.error("[%s] Video publishing failed.", run_id)
-                    result.status = "error"
-                    self.storage.save_run(run_id, "error")
-                    return result
+                    result.uploads.append(upload_result)
+                    if upload_result.success:
+                        self.storage.save_video(
+                            video_id=upload_result.video_id,
+                            trend_id=due_plan.trend_id,
+                            title=due_plan.title,
+                            privacy_status=upload_result.privacy_status,
+                        )
+                        logger.info(
+                            "[%s] Published video: %s (URL: %s)",
+                            run_id,
+                            upload_result.video_id,
+                            upload_result.url,
+                        )
+                        # For PPO, calculate immediate reward based on preliminary metrics
+                        reward = self.reward_shaper.shape(
+                            views=0, # Initial views are 0
+                            ctr=0.0,
+                            retention_30s=0.0
+                        )
+                        # Find the stored PPO transition and update its reward
+                        for t in self.ppo_transitions:
+                            # Assuming video_id is used to link transition to actual video
+                            if np.array_equal(t.state, content_state): # Fixed match
+                                t.reward = reward
+                                break
+                        # Train PPO policy periodically
+                        if len(self.ppo_transitions) >= 10: # Example batch size
+                            self.ppo_policy.update(self.ppo_transitions) # Fixed method call
+                            self.storage.clear_ppo_transitions()
+                            self.ppo_transitions.clear()
+                    else:
+                        logger.error("[%s] Video publishing failed.", run_id)
+                        result.status = "error"
+                        self.storage.save_run(run_id, "error")
+                        return result
             else:
                 logger.info(
                     "[%s] Dry-run mode: skipping actual video publishing.", run_id
