@@ -322,6 +322,7 @@ class YTAIMBotOrchestrator(object):
         compliance_checker: Any,  # ComplianceCheckerAdapter
         config: dict[str, Any],
         rng: np.random.Generator,
+        tts_adapter: Optional[TTSAdapter] = None,
     ) -> None:
         self.trend_source = trend_source
         self.script_generator = script_generator
@@ -331,6 +332,7 @@ class YTAIMBotOrchestrator(object):
         self.compliance_checker = compliance_checker
         self.config = config
         self.rng = rng
+        self.tts_adapter = tts_adapter
 
         self.trend_analyzer = TrendAnalyzer(rng=rng)
         self.quality_filter = BayesQualityFilter()
@@ -468,7 +470,7 @@ class YTAIMBotOrchestrator(object):
             # In a real scenario, this would involve more LLM calls
             content_plan = ContentPlan(
                 trend_id=top_trend.trend_id,
-                title=f"How to {top_keyword}",
+                title=f"How to master {top_keyword} step by step for beginners",
                 outline=[
                     "Introduction",
                     f"Why {top_keyword} is important",
@@ -495,7 +497,7 @@ class YTAIMBotOrchestrator(object):
 
             # 4. Script Generation
             if self.script_generator:
-                script = self.script_generator.generate_script(content_plan)
+                script = self.script_generator.generate(content_plan)
                 result.scripts.append(script)
                 logger.info(
                     "[%s] Generated script with %d sections (total words: %d).",
@@ -505,7 +507,8 @@ class YTAIMBotOrchestrator(object):
                 )
             else:
                 logger.warning("[%s] Script generator not available.", run_id)
-                script = Script(plan_id=content_plan.trend_id, sections=[]) # Placeholder
+                from ytaimbot_ml.schemas import ScriptSection
+                script = Script(plan_id=content_plan.trend_id, sections=[ScriptSection(name="dummy", text="dummy content")]) # Placeholder
 
             # 5. Content Quality & Compliance Checks
             archive = self.storage.load_archive()
@@ -547,7 +550,7 @@ class YTAIMBotOrchestrator(object):
             if not script.full_text.strip():
                 logger.warning("[%s] Script is empty. Skipping TTS and Video Assembly.", run_id)
             else:
-                tts_adapter = build_tts_adapter()
+                tts_adapter = self.tts_adapter or build_tts_adapter()
                 if tts_adapter:
                     try:
                         tts_adapter.speak(script.full_text, audio_path)
@@ -696,7 +699,7 @@ class YTAIMBotOrchestrator(object):
             # In a real scenario, fetch actual metrics from YouTube API
             # For now, simulate some metrics for demonstration
             metrics = {
-                "views": self.rng.randint(100, 10000),
+                "views": self.rng.integers(100, 10000),
                 "ctr": self.rng.uniform(0.02, 0.15),
                 "retention_30s": self.rng.uniform(0.3, 0.9),
                 "rpm": self.rng.uniform(0.5, 5.0),
@@ -845,6 +848,7 @@ class Pipeline:
         publisher: PublisherAdapter | None = None,
         dry_run: bool | None = None,
         seed: int = 42,
+        **kwargs
     ) -> None:
         self.config = self._load_config()
         self.config["YTAIMBOT_SEED"] = seed
@@ -864,15 +868,15 @@ class Pipeline:
         # Use injected adapters or build from config
         self.storage = storage or build_storage(self.config)
         self.trend_source = trend_source or build_trend_source(self.config)
-        self.script_generator = build_llm_adapter()
-        self.video_assembler = create_video_backend(self.config)
+        self.script_generator = kwargs.get("llm") or build_llm_adapter()
+        self.video_assembler = kwargs.get("video_assembler") or create_video_backend(self.config)
         self.compliance_checker = SimilarityGate()
         self.metrics_registry = build_metrics_collector(self.config)
 
         if publisher is not None:
             self.publisher = publisher
         elif self._dry_run:
-            self.publisher = build_manual_reviewer(self.config)
+            self.publisher = kwargs.get("manual_reviewer") or build_manual_reviewer(self.config)
         else:
             self.publisher = build_youtube_uploader(self.config)
 
@@ -885,6 +889,7 @@ class Pipeline:
             compliance_checker=self.compliance_checker,
             config=self.config,
             rng=rng,
+            tts_adapter=kwargs.get("tts"),
         )
 
     def _load_config(self) -> dict[str, Any]:
