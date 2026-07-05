@@ -425,6 +425,19 @@ class YTAIMBotOrchestrator(object):
         result = PipelineResult(run_id=run_id, status="error")
 
         try:
+            # Check for drift
+            published = self.storage.list_published_videos()
+            if len(published) >= 20:
+                metrics = []
+                for v in published[-30:]:
+                    m = self.storage.load_metrics(v["video_id"])
+                    if m: metrics.append(m.ctr)
+                if len(metrics) >= 20:
+                    drift_report = self.drift_detector.check(metrics[:len(metrics)//2], metrics[len(metrics)//2:])
+                    if drift_report.drift_detected:
+                        logger.warning("[%s] Drift detected! Resetting UCB1 Bandit.", run_id)
+                        self.niche_bandit.reset()
+
             # 1. Trend signal ingestion
             trends = self.trend_source.fetch()
             self.storage.save_trends(run_id, trends)
@@ -496,17 +509,7 @@ class YTAIMBotOrchestrator(object):
 
             # 5. Content Quality & Compliance Checks
             archive = self.storage.load_archive()
-            sim_report = self.compliance_checker.check(script.full_text, archive)
-            
-            # Map SimilarityReport to ComplianceReport until Bayes is fully integrated
-            from ytaimbot_ml.schemas import ComplianceReport # noqa
-            compliance_report = ComplianceReport(
-                content_hash=sim_report.content_hash,
-                similarity_score=sim_report.score,
-                bayes_p_bad=0.0,
-                decision=sim_report.decision,
-                reasons=[f"Similarity failure (score: {sim_report.score:.2f})"] if sim_report.decision == "fail" else []
-            )
+            compliance_report = self.compliance_checker.check(script.full_text, archive)
             
             self.storage.save_compliance(run_id, [compliance_report])
             result.compliance_reports.append(compliance_report)
@@ -514,8 +517,8 @@ class YTAIMBotOrchestrator(object):
                 "[%s] Compliance check decision: %s (Sim: %.2f, Bayes: %.2f)",
                 run_id,
                 compliance_report.decision,
-                compliance_report.similarity_score,
-                compliance_report.bayes_p_bad,
+                getattr(compliance_report, "similarity_score", getattr(compliance_report, "score", 0.0)),
+                getattr(compliance_report, "bayes_p_bad", 0.0),
             )
 
             if compliance_report.decision != "pass":
@@ -730,7 +733,6 @@ class YTAIMBotOrchestrator(object):
                             state=state,
                             action_idx=action_idx,
                             reward=reward,
-                            next_state=next_state,
                             prob=transition_data["prob"]
                         )
                     )
