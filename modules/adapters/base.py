@@ -14,7 +14,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from ytaimbot_ml.schemas import ComplianceReport, ContentPlan, TrendSignal, MetricsSnapshot
+from ytaimbot_ml.schemas import ComplianceReport, ContentPlan, TrendSignal, MetricsSnapshot, UploadJob
 
 
 class TrendSourceAdapter(ABC):
@@ -104,6 +104,18 @@ class StorageAdapter(ABC):
     @abstractmethod
     def clear_ppo_transitions(self) -> None:
         """Clear all PPO transitions after update."""
+
+    @abstractmethod
+    def load_upload_queue(self) -> list[UploadJob]:
+        """Load pending upload jobs from persistent storage."""
+
+    @abstractmethod
+    def save_upload_job(self, job: UploadJob) -> None:
+        """Save a pending upload job to storage."""
+
+    @abstractmethod
+    def delete_upload_job(self, plan_id: str) -> None:
+        """Delete an upload job from storage by plan_id."""
 
 
 class PublisherAdapter(ABC):
