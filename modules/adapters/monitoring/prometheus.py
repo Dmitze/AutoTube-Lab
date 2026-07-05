@@ -34,6 +34,15 @@ except ImportError:
 # Module-level metric singletons (registered once to avoid duplicate errors)
 # ---------------------------------------------------------------------------
 if _PROMETHEUS_AVAILABLE:
+    from prometheus_client import REGISTRY
+    # Prevent duplicate registration during pytest re-imports
+    for _name in list(REGISTRY._names_to_collectors.keys()):
+        if _name.startswith("ytaimbot_"):
+            try:
+                REGISTRY.unregister(REGISTRY._names_to_collectors[_name])
+            except KeyError:
+                pass
+
     _PIPELINE_RUNS = Counter(
         "ytaimbot_pipeline_runs_total",
         "Total pipeline runs by status",
