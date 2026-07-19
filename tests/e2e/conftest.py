@@ -85,17 +85,24 @@ def full_mock_pipeline(tmp_path: Path) -> Callable[..., Pipeline]:
                 output_fn=lambda _: None,
                 manual_quota=50,
             )
-        return Pipeline(
+        from unittest.mock import MagicMock
+        from ytaimbot_ml.schemas import VideoAsset
+        video_assembler = MagicMock()
+        video_assembler.assemble.return_value = VideoAsset(plan_id="e2e", video_path="mock.mp4", thumbnail_path="mock.png")
+        
+        pipeline = Pipeline(
             trend_source=source or SyntheticTrendSource(seed=42),
             storage=InMemoryStorage(),
-            publisher=publisher,
+            publisher=manual_reviewer if with_manual_review else publisher,
+            video_assembler=video_assembler,
             manual_reviewer=manual_reviewer,
             llm=FakeLLM(fail=llm_fail),
             tts=FakeTTS() if tts is None else tts,
             dry_run=dry_run,
             seed=42,
-            audio_dir=tmp_path / "audio",
         )
+        pipeline.orchestrator.config["YTAIMBOT_DATA_DIR"] = str(tmp_path)
+        return pipeline
 
     return _factory
 
