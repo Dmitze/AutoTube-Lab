@@ -63,13 +63,13 @@ def test_pipeline_result_stores_paths_after_run(tmp_path):
         ],
     )
     mock_script_gen = MagicMock()
-    mock_script_gen.generate_script.return_value = mock_script
+    mock_script_gen.generate.return_value = mock_script
 
     # Mock video assembler
     from ytaimbot_ml.schemas import VideoAsset
     mock_video = VideoAsset(plan_id="t001", video_path="/tmp/test.mp4", thumbnail_path="/tmp/test.jpg")
     mock_video_assembler = MagicMock()
-    mock_video_assembler.assemble_video.return_value = mock_video
+    mock_video_assembler.assemble.return_value = mock_video
 
     # Mock compliance checker
     from ytaimbot_ml.schemas import ComplianceReport
