@@ -10,6 +10,7 @@ and fake adapters only (no network, no real YouTube/LLM/TTS calls).
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from modules.adapters.base import LLMAdapter, PublisherAdapter, TTSAdapter
 from modules.adapters.synthetic import InMemoryStorage, SyntheticTrendSource
@@ -61,6 +62,7 @@ def test_full_pipeline_with_all_stages(tmp_path: Path) -> None:
         publisher=publisher,
         llm=_FakeLLM(),
         tts=_FakeTTS(),
+        video_assembler=MagicMock(),
         dry_run=False,
         seed=42,
         audio_dir=tmp_path / "audio",
@@ -70,8 +72,8 @@ def test_full_pipeline_with_all_stages(tmp_path: Path) -> None:
 
     assert result.status == "ok"
     assert len(result.rankings) >= 5
-    assert len(result.plans) == 5
-    assert len(result.compliance_reports) == 5
+    assert len(result.plans) == 1
+    assert len(result.compliance_reports) == 1
     assert len(result.scripts) >= 1
     assert len(publisher.published) >= 1
 
@@ -87,26 +89,26 @@ def test_full_pipeline_fail_closed(tmp_path: Path) -> None:
         publisher=publisher,
         llm=_FakeLLM(),
         tts=_FakeTTS(),
+        video_assembler=MagicMock(),
         dry_run=False,
         seed=42,
         audio_dir=tmp_path / "audio",
     )
 
     # Force all plans to fail compliance to test fail-closed publish behavior.
-    pipeline._gate_all = lambda plans: [  # type: ignore[method-assign]
-        ComplianceReport(
-            content_hash=f"hash-{i}",
-            similarity_score=1.0,
-            bayes_p_bad=0.99,
-            decision="fail",
-            reasons=["forced test fail"],
-        )
-        for i, _ in enumerate(plans)
-    ]
+    from ytaimbot_ml.schemas import ComplianceReport
+    pipeline.orchestrator.compliance_checker = MagicMock()
+    pipeline.orchestrator.compliance_checker.check.return_value = ComplianceReport(
+        content_hash="hash-fail",
+        similarity_score=1.0,
+        bayes_p_bad=0.99,
+        decision="fail",
+        reasons=["forced test fail"],
+    )
 
     result = pipeline.run(run_id="e2e-full-fail-closed")
 
-    assert result.status == "ok"
+    assert result.status == "blocked"
     assert all(report.decision == "fail" for report in result.compliance_reports)
     assert len(publisher.published) == 0
 
@@ -122,6 +124,7 @@ def test_full_pipeline_recovery_from_llm_error(tmp_path: Path) -> None:
         publisher=publisher,
         llm=_FakeLLM(fail=True),
         tts=_FakeTTS(),
+        video_assembler=MagicMock(),
         dry_run=False,
         seed=42,
         audio_dir=tmp_path / "audio",
@@ -133,4 +136,4 @@ def test_full_pipeline_recovery_from_llm_error(tmp_path: Path) -> None:
     assert result.status == "ok"
     assert len(result.scripts) == 0
     # No script -> no TTS artifact; publish may still happen for approved plans.
-    assert len(result.plans) == 5
+    assert len(result.plans) == 1
