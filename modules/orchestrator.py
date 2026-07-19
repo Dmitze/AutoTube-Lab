@@ -497,17 +497,26 @@ class YTAIMBotOrchestrator(object):
 
             # 4. Script Generation
             if self.script_generator:
-                script = self.script_generator.generate(content_plan)
-                result.scripts.append(script)
-                logger.info(
-                    "[%s] Generated script with %d sections (total words: %d).",
-                    run_id,
-                    len(script.sections),
-                    script.total_words,
-                )
+                try:
+                    script = self.script_generator.generate(content_plan, self.rng)
+                    if isinstance(script, str):
+                        from ytaimbot_ml.schemas import ScriptSection, Script
+                        script = Script(plan_id=content_plan.trend_id, sections=[ScriptSection(name="generated", text=script)])
+                    
+                    result.scripts.append(script)
+                    logger.info(
+                        "[%s] Generated script with %d sections (total words: %d).",
+                        run_id,
+                        len(script.sections),
+                        script.total_words,
+                    )
+                except Exception as e:
+                    logger.error("[%s] Script generation failed: %s", run_id, e)
+                    from ytaimbot_ml.schemas import ScriptSection, Script
+                    script = Script(plan_id=content_plan.trend_id, sections=[ScriptSection(name="dummy", text="dummy content")]) # Placeholder
             else:
                 logger.warning("[%s] Script generator not available.", run_id)
-                from ytaimbot_ml.schemas import ScriptSection
+                from ytaimbot_ml.schemas import ScriptSection, Script
                 script = Script(plan_id=content_plan.trend_id, sections=[ScriptSection(name="dummy", text="dummy content")]) # Placeholder
 
             # 5. Content Quality & Compliance Checks
@@ -601,6 +610,8 @@ class YTAIMBotOrchestrator(object):
                         content_hash="mock", similarity_score=0.0, bayes_p_bad=0.0, decision="pass", reasons=[]
                     )
                     
+                    from ytaimbot_ml.schemas import PrivacyStatus
+
                     if hasattr(self.publisher, "upload"):
                         upload_result = self.publisher.upload(
                             video_asset=due_video,
@@ -609,6 +620,32 @@ class YTAIMBotOrchestrator(object):
                             description=due_job.description,
                             tags=due_job.tags
                         )
+                    elif hasattr(self.publisher, "review"):
+                        from ytaimbot_ml.quality.similarity_gate import SimilarityReport
+                        # Translate ComplianceReport to SimilarityReport for ManualReviewCLI compatibility
+                        sim_report = SimilarityReport(
+                            decision="pass" if due_report.decision == "pass" else "block",
+                            content_hash=due_report.content_hash,
+                            score=due_report.similarity_score,
+                            matches=[]
+                        )
+                        decision = self.publisher.review(
+                            plan=due_plan,
+                            similarity=sim_report,
+                            upload_count=self.storage.get_upload_count(),
+                            compliance_score=1.0 - due_report.bayes_p_bad
+                        )
+                        is_approved = decision == "approve"
+                        if is_approved:
+                            upload_result = UploadResult(
+                                plan_id=due_plan.trend_id, video_id="manual-approved", url="manual",
+                                privacy_status=PrivacyStatus.UNLISTED, quota_used=0
+                            )
+                        else:
+                            upload_result = UploadResult(
+                                plan_id=due_plan.trend_id, video_id="", url="",
+                                privacy_status=PrivacyStatus.PRIVATE, quota_used=0
+                            )
                     else:
                         is_approved = self.publisher.publish(due_plan, due_report)
                         if is_approved:
@@ -649,7 +686,8 @@ class YTAIMBotOrchestrator(object):
                                 t.reward = reward
                                 break
                         # Train PPO policy periodically
-                        if len(self.ppo_transitions) >= 10: # Example batch size
+                        batch_size = int(self.config.get("PPO_BATCH_SIZE", "10"))
+                        if len(self.ppo_transitions) >= batch_size:
                             self.ppo_policy.update(self.ppo_transitions) # Fixed method call
                             self.storage.clear_ppo_transitions()
                             self.ppo_transitions.clear()
@@ -739,7 +777,8 @@ class YTAIMBotOrchestrator(object):
                             prob=transition_data["prob"]
                         )
                     )
-            if len(self.ppo_transitions) >= 10: # Example batch size
+            batch_size = int(self.config.get("PPO_BATCH_SIZE", "10"))
+            if len(self.ppo_transitions) >= batch_size:
                 self.ppo_policy.update(self.ppo_transitions)
                 self.storage.clear_ppo_transitions()
                 self.ppo_transitions.clear()
@@ -868,7 +907,12 @@ class Pipeline:
         # Use injected adapters or build from config
         self.storage = storage or build_storage(self.config)
         self.trend_source = trend_source or build_trend_source(self.config)
-        self.script_generator = kwargs.get("llm") or build_llm_adapter()
+        llm_adapter = kwargs.get("llm") or build_llm_adapter()
+        if llm_adapter:
+            from ytaimbot_ml.content.script_generator import ScriptGenerator
+            self.script_generator = ScriptGenerator(llm_adapter)
+        else:
+            self.script_generator = None
         self.video_assembler = kwargs.get("video_assembler") or create_video_backend(self.config)
         self.compliance_checker = SimilarityGate()
         self.metrics_registry = build_metrics_collector(self.config)
@@ -908,6 +952,7 @@ class Pipeline:
             "TTS_LANGUAGE": os.getenv("TTS_LANGUAGE"),
             "TTS_VOICE": os.getenv("TTS_VOICE"),
             "ENABLE_TTS": os.getenv("ENABLE_TTS", "0"),
+            "PPO_BATCH_SIZE": os.getenv("PPO_BATCH_SIZE", "10"),
         }
 
     def _build_compliance_checker(self) -> Any:
