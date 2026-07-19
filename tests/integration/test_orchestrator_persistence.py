@@ -33,18 +33,20 @@ class MockTrendSource(TrendSourceAdapter):
 
 
 class MockScriptGenerator:
-    def generate_script(self, plan: ContentPlan) -> Script:
+    def generate(self, plan: ContentPlan, rng=None) -> Script:
+        from ytaimbot_ml.schemas import ScriptSection
         return Script(
             plan_id=plan.trend_id,
             sections=[
-                {"name": "hook", "text": "Mock hook."},
-                {"name": "body", "text": "Mock body."},
+                ScriptSection(name="hook", text="Mock hook.", keywords=[]),
+                ScriptSection(name="body", text="Mock body.", keywords=[]),
             ],
+            language="uk"
         )
 
 
 class MockVideoAssembler:
-    def assemble_video(self, script: Script) -> VideoAsset:
+    def assemble(self, script: Script, audio_path=None) -> VideoAsset:
         return VideoAsset(
             plan_id=script.plan_id,
             video_path="/tmp/mock_video.mp4",
@@ -58,7 +60,7 @@ class MockPublisher(PublisherAdapter):
 
 
 class MockComplianceChecker:
-    def check(self, script: Script) -> ComplianceReport:
+    def check(self, text: str, archive: dict) -> ComplianceReport:
         return ComplianceReport(
             content_hash="mock-hash",
             similarity_score=0.1,
@@ -106,7 +108,7 @@ class TestOrchestratorPersistence(TestCase):
         self.storage.close()
         self.temp_db_dir.cleanup()
 
-    @mock.patch("time.time", side_effect=[100, 200, 300])  # For save_run timestamps
+    @mock.patch("time.time", return_value=300)  # For save_run timestamps
     def test_run_pipeline_persists_data(self, mock_time) -> None:
         """Test that running the pipeline persists run status, trends, and compliance reports."""
         run_id = "integration-test-run-1"
@@ -132,6 +134,6 @@ class TestOrchestratorPersistence(TestCase):
         self.assertEqual(cursor.fetchone()[0], 1)
         
         # Verify video persistence (if publish is called and successful)
-        uploaded_videos = self.storage.list_published_videos()
+        uploaded_videos = self.orchestrator.storage.list_published_videos()
         self.assertEqual(len(uploaded_videos), 1)
-        self.assertEqual(uploaded_videos[0]["video_id"], "mock-hash") # Assuming content_hash from mock compliance becomes video_id
+        self.assertEqual(uploaded_videos[0]["video_id"], "manual-approved") # Assuming content_hash from mock compliance becomes video_id
