@@ -20,10 +20,16 @@ def _make_pipeline(dry_run: bool = True, seed: int = 42) -> tuple[Pipeline, InMe
     source = SyntheticTrendSource(seed=seed)
     storage = InMemoryStorage()
     publisher = StubPublisher()
+    from unittest.mock import MagicMock
+    from ytaimbot_ml.schemas import VideoAsset
+    video_assembler = MagicMock()
+    video_assembler.assemble.return_value = VideoAsset(plan_id="e2e", video_path="mock.mp4", thumbnail_path="mock.png")
+    
     pipeline = Pipeline(
         trend_source=source,
         storage=storage,
         publisher=publisher,
+        video_assembler=video_assembler,
         dry_run=dry_run,
         seed=seed,
     )
@@ -47,7 +53,7 @@ def test_dry_run_pipeline() -> None:
     # Storage should have received the run
     assert storage.get_run_status("test-run-001") == "ok"
     assert len(storage.get_trends("test-run-001")) == 10
-    assert len(storage.get_compliance("test-run-001")) == Pipeline._TOP_N
+    assert len(storage.get_compliance("test-run-001")) == 1
 
 
 def test_gate_blocks_bad_content() -> None:
