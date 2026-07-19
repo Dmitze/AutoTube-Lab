@@ -2889,16 +2889,16 @@ class BlocklistTrie:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-501 | 🔲 | Реалізувати `BlocklistTrie` клас для content safety | `src/ytaimbot_ml/quality/blocklist.py` | L | T-004 | — |
-| T-502 | 🔲 | Створити `blocklist.txt` (заблоковані слова/фрази) | `src/ytaimbot_ml/quality/blocklist.txt` | M | T-501 | — |
-| T-503 | 🔲 | Реалізувати `ContentSanitizer` клас (Trie + regex) | `src/ytaimbot_ml/quality/sanitizer.py` | L | T-501 | — |
-| T-504 | 🔲 | Реалізувати `sanitize_script(text)` → str (видаляє заблоковане) | `src/ytaimbot_ml/quality/sanitizer.py` | M | T-503 | — |
-| T-505 | 🔲 | Реалізувати `validate_env_var(name, value, pattern)` → str | `src/ytaimbot_ml/utils/validation.py` | M | T-494 | — |
-| T-506 | 🔲 | Додати Pydantic validators до всіх dataclasses у schemas.py | `src/ytaimbot_ml/schemas.py` | L | T-002 | — |
-| T-507 | 🔲 | Реалізувати `validate_youtube_api_response(data)` → dict | `modules/adapters/youtube_search.py` | M | T-040 | — |
-| T-508 | 🔲 | Написати тести для BlocklistTrie та ContentSanitizer | `tests/test_content_safety.py` | M | T-501 | — |
-| T-509 | 🔲 | Тест: Trie search O(m) — не залежить від розміру списку | `tests/test_content_safety.py` | M | T-508 | — |
-| T-510 | 🔲 | Тест: sanitize_script() видаляє всі заблоковані слова | `tests/test_content_safety.py` | M | T-508 | — |
+| T-501 | ✅ | Реалізувати `BlocklistTrie` клас для content safety | `src/ytaimbot_ml/quality/blocklist.py` | L | T-004 | 2026-07-17 |
+| T-502 | ✅ | Створити `blocklist.txt` (заблоковані слова/фрази) | `src/ytaimbot_ml/quality/blocklist.txt` | M | T-501 | 2026-07-17 |
+| T-503 | ✅ | Реалізувати `ContentSanitizer` клас (Trie + regex) | `src/ytaimbot_ml/quality/sanitizer.py` | L | T-501 | 2026-07-17 |
+| T-504 | ✅ | Реалізувати `sanitize_script(text)` → str (видаляє заблоковане) | `src/ytaimbot_ml/quality/sanitizer.py` | M | T-503 | 2026-07-17 |
+| T-505 | ✅ | Реалізувати `validate_env_var(name, value, pattern)` → str | `src/ytaimbot_ml/utils/validation.py` | M | T-494 | 2026-07-17 |
+| T-506 | ✅ | Додати Pydantic validators до всіх dataclasses у schemas.py | `src/ytaimbot_ml/schemas.py` | L | T-002 | 2026-07-17 |
+| T-507 | ✅ | Реалізувати `validate_youtube_api_response(data)` → dict | `modules/adapters/youtube_search.py` | M | T-040 | 2026-07-17 |
+| T-508 | ✅ | Написати тести для BlocklistTrie та ContentSanitizer | `tests/test_content_safety.py` | M | T-501 | 2026-07-17 |
+| T-509 | ✅ | Тест: Trie search O(m) — не залежить від розміру списку | `tests/test_content_safety.py` | M | T-508 | 2026-07-17 |
+| T-510 | ✅ | Тест: sanitize_script() видаляє всі заблоковані слова | `tests/test_content_safety.py` | M | T-508 | 2026-07-17 |
 
 ---
 
@@ -2936,13 +2936,13 @@ class EvidenceArtifact:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-511 | 🔲 | Реалізувати `EvidenceArtifact` dataclass з chain_hash | `src/ytaimbot_ml/schemas.py` | M | T-002 | — |
-| T-512 | 🔲 | Реалізувати `EvidenceChain` клас (append-only, verifiable) | `src/ytaimbot_ml/quality/evidence.py` | L | T-511 | — |
-| T-513 | 🔲 | Реалізувати `append(artifact)` → перевіряє та додає до ланцюга | `src/ytaimbot_ml/quality/evidence.py` | M | T-512 | — |
-| T-514 | 🔲 | Реалізувати `verify_chain()` → bool (перевірка цілісності) | `src/ytaimbot_ml/quality/evidence.py` | M | T-512 | — |
-| T-515 | 🔲 | Реалізувати `ComplianceChecker` — автоматичний pre-publish checklist | `src/ytaimbot_ml/quality/compliance.py` | L | T-512, T-270 | — |
-| T-516 | 🔲 | Реалізувати перевірку AI disclosure у metadata | `src/ytaimbot_ml/quality/compliance.py` | M | T-515 | — |
-| T-517 | 🔲 | Реалізувати перевірку відсутності PII у скрипті (regex) | `src/ytaimbot_ml/quality/compliance.py` | M | T-515 | — |
+| T-511 | ✅ | Реалізувати `EvidenceArtifact` dataclass з chain_hash | `src/ytaimbot_ml/schemas.py` | M | T-002 | 2026-07-17 |
+| T-512 | ✅ | Реалізувати `EvidenceChain` клас (append-only, verifiable) | `src/ytaimbot_ml/quality/evidence.py` | L | T-511 | 2026-07-17 |
+| T-513 | ✅ | Реалізувати `append(artifact)` → перевіряє та додає до ланцюга | `src/ytaimbot_ml/quality/evidence.py` | M | T-512 | 2026-07-17 |
+| T-514 | ✅ | Реалізувати `verify_chain()` → bool (перевірка цілісності) | `src/ytaimbot_ml/quality/evidence.py` | M | T-512 | 2026-07-17 |
+| T-515 | ✅ | Реалізувати `ComplianceChecker` — автоматичний pre-publish checklist | `src/ytaimbot_ml/quality/compliance.py` | L | T-512, T-270 | 2026-07-17 |
+| T-516 | ✅ | Реалізувати перевірку AI disclosure у metadata | `src/ytaimbot_ml/quality/compliance.py` | M | T-515 | 2026-07-17 |
+| T-517 | ✅ | Реалізувати перевірку відсутності PII у скрипті (regex) | `src/ytaimbot_ml/quality/compliance.py` | M | T-515 | 2026-07-17 |
 | T-518 | 🔲 | Реалізувати log retention cleanup (видалення логів > 30 днів) | `scripts/deploy/cleanup_logs.sh` | S | T-448 | — |
 | T-519 | 🔲 | Написати тести для EvidenceChain та ComplianceChecker | `tests/test_compliance.py` | M | T-512 | — |
 | T-520 | 🔲 | Тест: verify_chain() — підроблений artifact → False | `tests/test_compliance.py` | M | T-519 | — |
