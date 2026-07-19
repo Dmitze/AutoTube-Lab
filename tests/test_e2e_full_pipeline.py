@@ -67,7 +67,7 @@ def test_e2e_full_pipeline_dry_run():
     )
 
     pipeline.orchestrator.script_generator = MagicMock()
-    pipeline.orchestrator.script_generator.generate_script.return_value = _make_script()
+    pipeline.orchestrator.script_generator.generate.return_value = _make_script()
     pipeline.orchestrator.tts_adapter = MagicMock()
     pipeline.orchestrator.tts_adapter.generate_audio.return_value = "fake.mp3"
     pipeline.orchestrator.video_assembler = MagicMock()
@@ -123,7 +123,7 @@ def test_e2e_pipeline_non_dry_run_calls_publisher():
     )
 
     pipeline.orchestrator.script_generator = MagicMock()
-    pipeline.orchestrator.script_generator.generate_script.return_value = _make_script()
+    pipeline.orchestrator.script_generator.generate.return_value = _make_script()
     pipeline.orchestrator.tts_adapter = MagicMock()
     pipeline.orchestrator.tts_adapter.generate_audio.return_value = "fake.mp3"
     pipeline.orchestrator.video_assembler = MagicMock()
@@ -167,7 +167,7 @@ def test_e2e_pipeline_blocked_when_all_fail_gate():
         seed=42,
     )
     pipeline.orchestrator.script_generator = MagicMock()
-    pipeline.orchestrator.script_generator.generate_script.return_value = _make_script()
+    pipeline.orchestrator.script_generator.generate.return_value = _make_script()
     pipeline.orchestrator.tts_adapter = MagicMock()
     pipeline.orchestrator.tts_adapter.generate_audio.return_value = "fake.mp3"
     pipeline.orchestrator.video_assembler = MagicMock()
