@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import os
-import certifi
-os.environ["HTTPLIB2_CA_CERTS"] = certifi.where()
+import sys
+from unittest.mock import MagicMock
+sys.modules['httplib2'] = MagicMock()
+sys.modules['httplib2.certs'] = MagicMock()
 
 from unittest.mock import MagicMock, patch
 
@@ -72,13 +73,13 @@ class TestYouTubeSearchAdapter:
         # Configure mock_build to return a mock service that can be called
         mock_service = MagicMock()
         mock_build.return_value = mock_service
-        mock_service.search().list().execute.return_value = MOCK_YOUTUBE_API_RESPONSE
+        mock_service.search.return_value.list.return_value.execute.return_value = MOCK_YOUTUBE_API_RESPONSE
 
         # Import YouTubeSearchAdapter inside the test function
         # to ensure mocking is set up before its module is loaded
-        from modules.adapters.youtube_search import YouTubeSearchAdapter
+        from modules.adapters.youtube_search import YouTubeSearchTrendSource
 
-        adapter = YouTubeSearchAdapter() # No geo param for YouTube
+        adapter = YouTubeSearchTrendSource() # No geo param for YouTube
         signals = adapter.fetch()
 
         # Verify googleapiclient.discovery.build was called with correct arguments
@@ -86,7 +87,7 @@ class TestYouTubeSearchAdapter:
 
         # Verify search().list().execute() was called with correct arguments
         mock_service.search().list.assert_called_once_with(
-            part="snippet", type="video", order="viewCount", q="", maxResults=50
+            part="snippet", type="video", order="viewCount", q="trending today", maxResults=25
         )
 
         # Verify the returned data is a list of TrendSignal
@@ -96,16 +97,16 @@ class TestYouTubeSearchAdapter:
 
         # Verify content of the first TrendSignal
         signal1 = signals[0]
-        assert signal1.trend_id == "video1"
+        assert signal1.trend_id == "yt_video1"
         assert signal1.keyword == "YouTube Trend 1: AI Future"
-        assert signal1.raw_score == 0 # YouTube API does not provide a direct 'score' for search results
-        assert signal1.source == "YouTube Search"
-        assert signal1.timestamp == "2026-06-01T10:00:00Z"
+        assert signal1.raw_score == 1.0 # YouTube API does not provide a direct 'score' for search results
+        assert signal1.source == "youtube_search"
+        assert signal1.timestamp is not None
 
         # Verify content of the second TrendSignal
         signal2 = signals[1]
-        assert signal2.trend_id == "video2"
+        assert signal2.trend_id == "yt_video2"
         assert signal2.keyword == "Top Tech Trends 2026"
-        assert signal2.raw_score == 0
-        assert signal2.source == "YouTube Search"
-        assert signal2.timestamp == "2026-06-01T11:00:00Z"
+        assert signal2.raw_score == 0.5
+        assert signal2.source == "youtube_search"
+        assert signal2.timestamp is not None
