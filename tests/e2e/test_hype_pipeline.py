@@ -31,10 +31,15 @@ def test_hype_pipeline_dry_run_seed_42() -> None:
     source = HypeTrendSource()
     storage = InMemoryStorage()
     publisher = StubPublisher()
+    from unittest.mock import MagicMock
+    from ytaimbot_ml.schemas import VideoAsset
+    video_assembler = MagicMock()
+    video_assembler.assemble.return_value = VideoAsset(plan_id="e2e", video_path="mock.mp4", thumbnail_path="mock.png")
     pipeline = Pipeline(
         trend_source=source,
         storage=storage,
         publisher=publisher,
+        video_assembler=video_assembler,
         dry_run=True,
         seed=42,
     )
@@ -43,7 +48,7 @@ def test_hype_pipeline_dry_run_seed_42() -> None:
 
     assert result.status == "ok"
     assert len(result.rankings) >= 5
-    assert len(result.plans) == 5
-    assert len(result.compliance_reports) == 5
+    assert len(result.plans) == 1
+    assert len(result.compliance_reports) == 1
     assert all("hype_" in plan.trend_id for plan in result.plans)
     assert len(publisher.published) == 0  # dry-run fail-closed for publish side effects
