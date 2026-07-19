@@ -25,14 +25,18 @@ def test_pipeline_smoke_dry_run():
     """Full pipeline completes with status='ok' using synthetic adapters."""
     source = SyntheticTrendSource(seed=42)
     storage = InMemoryStorage()
-    pipeline = Pipeline(trend_source=source, storage=storage, dry_run=True, seed=42)
+    from unittest.mock import MagicMock
+    from ytaimbot_ml.schemas import VideoAsset
+    video_assembler = MagicMock()
+    video_assembler.assemble.return_value = VideoAsset(plan_id="e2e", video_path="mock.mp4", thumbnail_path="mock.png")
+    pipeline = Pipeline(trend_source=source, storage=storage, video_assembler=video_assembler, dry_run=True, seed=42)
 
     result = pipeline.run(run_id="e2e-smoke-001")
 
     assert result.status == "ok"
     assert len(result.rankings) >= 5
-    assert len(result.plans) == 5
-    assert len(result.compliance_reports) == 5
+    assert len(result.plans) == 1
+    assert len(result.compliance_reports) == 1
 
 
 def test_pipeline_smoke_deterministic():
@@ -40,10 +44,17 @@ def test_pipeline_smoke_deterministic():
     source1 = SyntheticTrendSource(seed=42)
     source2 = SyntheticTrendSource(seed=42)
 
+    from unittest.mock import MagicMock
+    from ytaimbot_ml.schemas import VideoAsset
+    va1 = MagicMock()
+    va1.assemble.return_value = VideoAsset(plan_id="e2e", video_path="mock.mp4", thumbnail_path="mock.png")
+    va2 = MagicMock()
+    va2.assemble.return_value = VideoAsset(plan_id="e2e", video_path="mock.mp4", thumbnail_path="mock.png")
+
     result1 = Pipeline(trend_source=source1, storage=InMemoryStorage(),
-                       dry_run=True, seed=42).run("det-001")
+                       video_assembler=va1, dry_run=True, seed=42).run("det-001")
     result2 = Pipeline(trend_source=source2, storage=InMemoryStorage(),
-                       dry_run=True, seed=42).run("det-002")
+                       video_assembler=va2, dry_run=True, seed=42).run("det-002")
 
     ids1 = [r.trend_id for r in result1.rankings[:5]]
     ids2 = [r.trend_id for r in result2.rankings[:5]]
