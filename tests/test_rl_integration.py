@@ -36,11 +36,19 @@ def rl_pipeline(tmp_path):
     # Mock data dir
     os.environ["YTAIMBOT_DATA_DIR"] = str(tmp_path)
     os.environ["STORAGE_BACKEND"] = "in_memory"
+    os.environ["PPO_BATCH_SIZE"] = "1"
+    
+    from unittest.mock import MagicMock
+    from ytaimbot_ml.schemas import VideoAsset
+    video_assembler = MagicMock()
+    # Ensure it returns a VideoAsset when called
+    video_assembler.assemble.return_value = VideoAsset(plan_id="niche", video_path="mock.mp4", thumbnail_path="mock.png")
     
     pipeline = Pipeline(
         trend_source=source,
         storage=storage,
         publisher=publisher,
+        video_assembler=video_assembler,
         dry_run=False, # Allow publishing to record transitions
         seed=42,
     )
@@ -64,14 +72,13 @@ def test_rl_niche_selection_and_feedback(rl_pipeline):
     snapshot = MetricsSnapshot(video_id="run-1-video", views=5000, ctr=0.1, retention_30s=0.8)
     storage.save_metrics(snapshot)
     
-    # 3. Second run: should run feedback loop and update bandit
+    # 3. Run feedback loop and update bandit
+    pipeline.orchestrator.optimize_niche_weights()
     result2 = pipeline.run(run_id="run-2")
     assert result2.status == "ok"
     
     # Check that bandit was updated
     stats = pipeline.orchestrator.niche_bandit.stats["ghibli_asmr"]
-    # Depending on how many videos were "published" in run-1
-    # In our stub, all approved plans are published. Pipeline._TOP_N = 5.
     assert stats.n_pulls > 0
 
 
