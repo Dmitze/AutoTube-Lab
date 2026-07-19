@@ -128,7 +128,8 @@ class InMemoryStorage(StorageAdapter):
         return None
 
     def load_archive(self) -> dict[str, str]:
-        return {r.content_hash: " ".join(r.reasons) for reports in self._compliance.values() for r in reports}
+        # Return dummy archive texts
+        return {getattr(r, "content_hash", str(id(r))): " ".join(getattr(r, "reasons", ["dummy_text"])) for reports in self._compliance.values() for r in reports}
 
     def get_upload_count(self) -> int:
         return len(self._videos)
