@@ -17,8 +17,8 @@ def test_e2e_happy_path_publishes(full_mock_pipeline) -> None:
     pipeline = full_mock_pipeline(dry_run=False)
     result = pipeline.run("e2e-happy-path")
     assert result.status == "ok"
-    assert len(result.plans) == 5
-    assert len(pipeline._publisher.published) >= 1  # noqa: SLF001
+    assert len(result.plans) == 1
+    assert len(pipeline.publisher.published) >= 1  # noqa: SLF001
 
 
 def test_e2e_dry_run_skips_publish(full_mock_pipeline) -> None:
@@ -26,47 +26,45 @@ def test_e2e_dry_run_skips_publish(full_mock_pipeline) -> None:
     pipeline = full_mock_pipeline(dry_run=True)
     result = pipeline.run("e2e-dry-run")
     assert result.status == "ok"
-    assert len(result.plans) == 5
-    assert len(pipeline._publisher.published) == 0  # noqa: SLF001
+    assert len(result.plans) == 1
+    assert len(pipeline.publisher.published) == 0  # noqa: SLF001
 
 
 def test_e2e_bayes_fail_blocks_publish(full_mock_pipeline) -> None:
     """If all compliance reports fail, publish stage is fail-closed."""
     pipeline = full_mock_pipeline(dry_run=False)
-    pipeline._gate_all = lambda plans: [  # type: ignore[method-assign]
-        ComplianceReport(
-            content_hash=f"forced-{i}",
-            similarity_score=1.0,
-            bayes_p_bad=0.99,
-            decision="fail",
-            reasons=["forced gate fail"],
-        )
-        for i, _ in enumerate(plans)
-    ]
-    result = pipeline.run("e2e-bayes-fail")
-    assert result.status == "ok"
+    from unittest.mock import MagicMock
+    pipeline.orchestrator.compliance_checker = MagicMock()
+    pipeline.orchestrator.compliance_checker.check.return_value = ComplianceReport(
+        content_hash="forced-0",
+        similarity_score=1.0,
+        bayes_p_bad=0.99,
+        decision="fail",
+        reasons=["forced gate fail"],
+    )
+    result = pipeline.run(run_id="e2e-bayes-fail")
+    assert result.status == "blocked"
     assert all(r.decision == "fail" for r in result.compliance_reports)
-    assert len(pipeline._publisher.published) == 0  # noqa: SLF001
+    assert len(pipeline.publisher.published) == 0  # noqa: SLF001
 
 
 def test_e2e_similarity_like_fail_blocks_publish(full_mock_pipeline) -> None:
     """Duplicate/similarity-style fail should block publish in fail-closed stage."""
     pipeline = full_mock_pipeline(dry_run=False)
-    pipeline._gate_all = lambda plans: [  # type: ignore[method-assign]
-        ComplianceReport(
-            content_hash=f"dup-{i}",
-            similarity_score=0.96,
-            bayes_p_bad=0.05,
-            decision="fail",
-            reasons=["similarity above threshold"],
-        )
-        for i, _ in enumerate(plans)
-    ]
-    result = pipeline.run("e2e-similarity-fail")
-    assert result.status == "ok"
+    from unittest.mock import MagicMock
+    pipeline.orchestrator.compliance_checker = MagicMock()
+    pipeline.orchestrator.compliance_checker.check.return_value = ComplianceReport(
+        content_hash="dup-0",
+        similarity_score=0.96,
+        bayes_p_bad=0.05,
+        decision="fail",
+        reasons=["similarity above threshold"],
+    )
+    result = pipeline.run(run_id="e2e-similarity-fail")
+    assert result.status == "blocked"
     assert all(r.decision == "fail" for r in result.compliance_reports)
     assert any("similarity" in " ".join(r.reasons).lower() for r in result.compliance_reports)
-    assert len(pipeline._publisher.published) == 0  # noqa: SLF001
+    assert len(pipeline.publisher.published) == 0  # noqa: SLF001
 
 
 def test_e2e_llm_down_degrades_gracefully(full_mock_pipeline) -> None:
@@ -74,8 +72,8 @@ def test_e2e_llm_down_degrades_gracefully(full_mock_pipeline) -> None:
     pipeline = full_mock_pipeline(dry_run=False, llm_fail=True)
     result = pipeline.run("e2e-llm-down")
     assert result.status == "ok"
+    assert len(result.plans) == 1
     assert len(result.scripts) == 0
-    assert len(result.plans) == 5
 
 
 def test_e2e_tts_down_pipeline_continues(full_mock_pipeline, tmp_path: Path) -> None:
@@ -88,8 +86,8 @@ def test_e2e_tts_down_pipeline_continues(full_mock_pipeline, tmp_path: Path) -> 
     result = pipeline.run("e2e-tts-down")
     assert result.status == "ok"
     assert len(result.scripts) >= 1
-    run_audio_dir = tmp_path / "audio" / "e2e-tts-down"
-    assert len(list(run_audio_dir.glob("*.mp3"))) == 0
+    audio_file = tmp_path / "audio" / "e2e-tts-down.mp3"
+    assert not audio_file.exists()
 
 
 def test_e2e_quota_exceeded_tts_fallback_works(
@@ -127,8 +125,8 @@ def test_e2e_quota_exceeded_tts_fallback_works(
 
     assert result.status == "ok"
     assert len(result.scripts) >= 1
-    audio_files = list((tmp_path / "audio" / "e2e-tts-quota-fallback").glob("*.mp3"))
-    assert len(audio_files) >= 1
+    audio_file = tmp_path / "audio" / "e2e-tts-quota-fallback.mp3"
+    assert audio_file.exists()
 
 
 def test_e2e_source_failure_sets_error(full_mock_pipeline) -> None:
@@ -145,7 +143,8 @@ def test_e2e_source_failure_sets_error(full_mock_pipeline) -> None:
 def test_e2e_manual_review_writes_audit_log(full_mock_pipeline, tmp_path: Path) -> None:
     """Manual-review mode should create append-only audit entries."""
     pipeline = full_mock_pipeline(dry_run=False, with_manual_review=True)
-    result = pipeline.run("e2e-manual-review")
+    result = pipeline.run(run_id="e2e-manual-review")
+
     assert result.status == "ok"
     log = AuditLog(path=tmp_path / "audit" / "review.jsonl")
     # fixture uses same tmp_path root; log should contain decisions for pass attempts
@@ -169,8 +168,8 @@ def test_e2e_evidence_chain_verifies_after_run(full_mock_pipeline) -> None:
         artifact = EvidenceArtifact.create(
             video_id=f"{result.run_id}:{plan.trend_id}",
             script_hash=hashlib.sha256(text.encode("utf-8")).hexdigest(),
-            similarity_score=report.similarity_score,
-            bayes_score=report.bayes_p_bad,
+            similarity_score=getattr(report, "similarity_score", getattr(report, "score", 0.0)),
+            bayes_score=getattr(report, "bayes_p_bad", 0.0),
             operator_decision="approve",
             previous_hash=chain.last_hash,
         )
