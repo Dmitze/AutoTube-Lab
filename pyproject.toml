@@ -45,12 +45,29 @@ line-length = 100
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "W", "F"]
-ignore = ["E501"]
+# E/W = pycodestyle, F = pyflakes, I = isort, UP = pyupgrade
+select = ["E", "W", "F", "I", "UP"]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "UP007",  # Use X | Y for union types (requires Python 3.10+)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ytaimbot_ml", "modules"]
+
+# T-480: bandit security scan configuration
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "htmlcov"]
+skips = [
+    "B101",  # assert statements (fine in tests)
+    "B311",  # random (we use np.random.Generator per RULE-08)
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --tb=short"
+# T-485: coverage settings — threshold raised to 90 once T-567–T-573 (P9) complete
+addopts = "-q --tb=short --cov=src --cov=modules --cov-report=term-missing --cov-fail-under=80"
+asyncio_mode = "auto"
