@@ -1,18 +1,59 @@
 name: Release
 
-# Triggered on version tags: v0.1.0, v1.2.3, etc.
+# T-483: Release workflow — triggered on version tags v* → build + push to GHCR
+# Covers: T-483 (release.yml), T-490 (CI/CD docs reference)
+
 on:
   push:
     tags:
-      - "v*"
+      - "v*"   # triggers on v0.1.0, v1.2.3, etc.
 
 jobs:
-  release:
-    name: Build and push Docker image to GHCR
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 1: Run CI gate before releasing (safety check)
+  # ─────────────────────────────────────────────────────────────────────────────
+  ci-check:
+    name: Pre-release CI Gate
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check src/ modules/ --output-format=github
+
+      - name: Security scan (bandit)
+        run: bandit -r src/ modules/ -ll -q
+
+      - name: Tests
+        run: pytest -q --tb=short --cov=src --cov=modules --cov-fail-under=80
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 2: Build & push Docker image to GHCR
+  # T-483: tag v* → image in GHCR automatically
+  # T-488: docker build < 5 minutes
+  # ─────────────────────────────────────────────────────────────────────────────
+  release:
+    name: Build & Push to GHCR
+    runs-on: ubuntu-latest
+    needs: ci-check
+    permissions:
+      contents: write    # create GitHub Release
+      packages: write    # push to GHCR
 
     steps:
       - name: Checkout
@@ -21,7 +62,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to GitHub Container Registry (GHCR)
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -36,9 +77,12 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
             type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image (linux/amd64 + linux/arm64)
+        id: build-push
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -47,17 +91,36 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Build for both x86 (Hetzner CX22) and ARM (Oracle Cloud Always-Free)
           platforms: linux/amd64,linux/arm64
 
+      # ─────────────────────────────────────────────────────────────────────────
+      # JOB 2.3: Create GitHub Release with auto-generated notes
+      # ─────────────────────────────────────────────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           body: |
-            ## YTAIMBot ${{ github.ref_name }}
+            ## 🤖 YTAIMBot ${{ github.ref_name }}
 
-            Docker image: `ghcr.io/${{ github.repository }}:${{ github.ref_name }}`
-
+            ### Docker Image
             ```bash
+            # Pull from GHCR
             docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+
+            # Run locally (dry run)
+            docker run --env-file .env \
+              -e YTAIMBOT_DRY_RUN=true \
+              ghcr.io/${{ github.repository }}:${{ github.ref_name }}
             ```
+
+            ### Image digest
+            `${{ steps.build-push.outputs.digest }}`
+
+            ### Platforms
+            - `linux/amd64` — Hetzner CX22 / GitHub Actions
+            - `linux/arm64` — Oracle Cloud Always-Free ARM VM
+
+            ---
+            📖 See [DEPLOYMENT_CLOUD_VPS.md](docs/DEPLOYMENT_CLOUD_VPS.md) for VPS setup guide.
