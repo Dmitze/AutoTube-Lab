@@ -1,0 +1,61 @@
+# docker-compose.test.yml — T-486
+# Isolated test environment for CI — no external services, all mocked.
+# Usage:
+#   docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+#   docker compose -f docker-compose.test.yml down --volumes
+
+version: "3.9"
+
+services:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Test runner: runs full pytest suite inside the container
+  # Mounts source code as read-only so tests run against current workspace.
+  # All network calls are expected to be mocked (RULE-06).
+  # ─────────────────────────────────────────────────────────────────────────────
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder    # use builder stage if multi-stage; falls back gracefully
+    image: ytaimbot-test:latest
+    command: >
+      python -m pytest -q --tb=short
+        --cov=src --cov=modules
+        --cov-report=term-missing
+        --cov-report=xml:/reports/coverage.xml
+        --cov-fail-under=80
+    environment:
+      # Force deterministic seed (RULE-08)
+      - YTAIMBOT_SEED=42
+      # Dry run — never publish in test environment
+      - YTAIMBOT_DRY_RUN=true
+      # Disable all real external services (tests must mock these)
+      - YOUTUBE_API_KEY=test-key-ci
+      - GROQ_API_KEY=test-key-ci
+      - GEMINI_API_KEY=test-key-ci
+      - ELEVENLABS_API_KEY=test-key-ci
+      - PEXELS_API_KEY=test-key-ci
+      - PIXABAY_API_KEY=test-key-ci
+      - SLACK_WEBHOOK_URL=
+      # Suppress Prometheus HTTP server in tests
+      - PROMETHEUS_PORT=0
+    volumes:
+      # Mount source for live test run (read-only)
+      - ./src:/app/src:ro
+      - ./modules:/app/modules:ro
+      - ./tests:/app/tests:ro
+      # Coverage reports output (writable)
+      - test-reports:/reports
+    # No port exposure needed — pure test runner
+    # No restart — run once and exit
+    restart: "no"
+    # Resource limits to simulate Hetzner CX22 constraints
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2"
+
+volumes:
+  test-reports:
+    driver: local
