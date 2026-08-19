@@ -515,22 +515,47 @@ class YTAIMBotOrchestrator(object):
                     from ytaimbot_ml.schemas import ScriptSection, Script
                     script = Script(plan_id=content_plan.trend_id, sections=[ScriptSection(name="dummy", text="dummy content")]) # Placeholder
             else:
-                logger.warning("[%s] Script generator not available.", run_id)
-                from ytaimbot_ml.schemas import ScriptSection, Script
-                script = Script(plan_id=content_plan.trend_id, sections=[ScriptSection(name="dummy", text="dummy content")]) # Placeholder
+                logger.warning("[%s] Script generator not available — using keyword-based fallback.", run_id)
+                from ytaimbot_ml.schemas import ScriptSection, Script  # noqa: PLC0415
+                fallback_text = (
+                    f"Today we're exploring the topic: {content_plan.title}. "
+                    f"This is one of the trending topics right now. "
+                    f"Let's take a closer look at what makes it so interesting and why people are talking about it. "
+                    f"Stay tuned for more content like this on our channel."
+                )
+                script = Script(
+                    plan_id=content_plan.trend_id,
+                    sections=[ScriptSection(name="intro", text=fallback_text)],
+                )
 
             # 5. Content Quality & Compliance Checks
             archive = self.storage.load_archive()
-            compliance_report = self.compliance_checker.check(script.full_text, archive)
-            
+            raw_report = self.compliance_checker.check(script.full_text, archive)
+
+            # Normalize: SimilarityGate returns SimilarityReport{score, decision, content_hash, matches}
+            # but the rest of the pipeline (sqlite, result) expects ComplianceReport{similarity_score,
+            # bayes_p_bad, decision, reasons, content_hash}.
+            from ytaimbot_ml.schemas import ComplianceReport  # noqa: PLC0415
+            if isinstance(raw_report, ComplianceReport):
+                compliance_report = raw_report
+            else:
+                # SimilarityReport → ComplianceReport adapter
+                compliance_report = ComplianceReport(
+                    content_hash=getattr(raw_report, "content_hash", ""),
+                    similarity_score=getattr(raw_report, "score", 0.0),
+                    bayes_p_bad=0.0,  # SimilarityGate doesn't compute bayes
+                    decision=getattr(raw_report, "decision", "pass"),
+                    reasons=getattr(raw_report, "matches", []),
+                )
+
             self.storage.save_compliance(run_id, [compliance_report])
             result.compliance_reports.append(compliance_report)
             logger.info(
                 "[%s] Compliance check decision: %s (Sim: %.2f, Bayes: %.2f)",
                 run_id,
                 compliance_report.decision,
-                getattr(compliance_report, "similarity_score", getattr(compliance_report, "score", 0.0)),
-                getattr(compliance_report, "bayes_p_bad", 0.0),
+                compliance_report.similarity_score,
+                compliance_report.bayes_p_bad,
             )
 
             if compliance_report.decision != "pass":
@@ -570,30 +595,48 @@ class YTAIMBotOrchestrator(object):
                 else:
                     logger.info("[%s] TTS adapter not available — audio skipped", run_id)
 
-                # 6. Video Assembly
+                # 6. Video Assembly — wrapped to survive corrupt/empty audio files
                 if result.audio_path:
                     audio_p = Path(result.audio_path)
-                    video_asset = self.video_assembler.assemble(script=script, audio_path=audio_p)
-                    result.videos.append(video_asset)
-                    logger.info(
-                        "[%s] Assembled video: %s (thumbnail: %s).",
-                        run_id,
-                        video_asset.video_path,
-                        video_asset.thumbnail_path,
-                    )
-                    
-                    # Schedule job
-                    job = UploadJob(
-                        scheduled_at=time.time(),
-                        plan_id=content_plan.trend_id,
-                        video_path=video_asset.video_path,
-                        thumbnail_path=video_asset.thumbnail_path or "",
-                        title=content_plan.title,
-                        description=content_plan.outline[0] if content_plan.outline else "",
-                        tags=content_plan.keywords
-                    )
-                    self.upload_scheduler.schedule(job)
-                    logger.info("[%s] Scheduled video for upload: %s", run_id, video_asset.video_path)
+                    # Guard: skip assembly if audio file is empty or too small (< 1 KB)
+                    audio_size = audio_p.stat().st_size if audio_p.exists() else 0
+                    if audio_size < 1024:
+                        logger.warning(
+                            "[%s] Audio file is too small (%d bytes) — likely empty TTS output. "
+                            "Skipping video assembly for this run.",
+                            run_id,
+                            audio_size,
+                        )
+                    else:
+                        try:
+                            video_asset = self.video_assembler.assemble(script=script, audio_path=audio_p)
+                            result.videos.append(video_asset)
+                            logger.info(
+                                "[%s] Assembled video: %s (thumbnail: %s).",
+                                run_id,
+                                video_asset.video_path,
+                                video_asset.thumbnail_path,
+                            )
+
+                            # Schedule job
+                            job = UploadJob(
+                                scheduled_at=time.time(),
+                                plan_id=content_plan.trend_id,
+                                video_path=video_asset.video_path,
+                                thumbnail_path=video_asset.thumbnail_path or "",
+                                title=content_plan.title,
+                                description=content_plan.outline[0] if content_plan.outline else "",
+                                tags=content_plan.keywords,
+                            )
+                            self.upload_scheduler.schedule(job)
+                            logger.info("[%s] Scheduled video for upload: %s", run_id, video_asset.video_path)
+
+                        except (OSError, IOError, Exception) as video_exc:
+                            logger.error(
+                                "[%s] Video assembly failed (non-fatal, pipeline continues): %s",
+                                run_id,
+                                video_exc,
+                            )
 
             # 7. Publishing (process queue)
             if not self.dry_run:
