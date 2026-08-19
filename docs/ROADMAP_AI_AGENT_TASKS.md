@@ -136,7 +136,7 @@ class Task:
 | **P4** | Publishing Pipeline | 30 | 25 | 0 | 5 |
 | **P5** | Metrics Feedback Loop | 70 | 62 | 0 | 8 |
 | **P6** | RL Learner + Bandit | 60 | 56 | 0 | 4 |
-| **P7** | Infrastructure + DevOps | 50 | 22 | 0 | 28 |
+| **P7** | Infrastructure + DevOps | 50 | 34 | 0 | 16 |
 | **P8** | Security + Compliance | 40 | 0 | 0 | 40 |
 | **P9** | Testing + Coverage | 50 | 18 | 0 | 32 |
 | **P10** | Docs + Finalization | 30 | 0 | 0 | 30 |
@@ -2758,18 +2758,18 @@ GFS алгоритм:
 
 | ID | Статус | Задача | Файл(и) | Склад. | Залежить від | Виконано |
 |----|--------|--------|---------|--------|-------------|---------|
-| T-479 | 🔲 | Додати `ruff` linter до pyproject.toml та CI | `pyproject.toml`, `.github/workflows/ci.yml` | S | T-013 | — |
-| T-480 | 🔲 | Додати `bandit` security scanner до CI | `.github/workflows/ci.yml` | S | T-013 | — |
-| T-481 | 🔲 | Додати docker build перевірку до CI | `.github/workflows/ci.yml` | S | T-014 | — |
-| T-482 | 🔲 | Додати coverage badge до README.md | `README.md`, `.github/workflows/ci.yml` | S | T-013 | — |
-| T-483 | 🔲 | Написати `release.yml` workflow (tag v* → GHCR push) | `.github/workflows/release.yml` | L | T-013 | — |
-| T-484 | 🔲 | Налаштувати Dependabot для auto-update залежностей | `.github/dependabot.yml` | S | T-013 | — |
-| T-485 | 🔲 | Додати `pytest --cov` coverage звіт до PR коментарів | `.github/workflows/ci.yml` | M | T-013 | — |
-| T-486 | 🔲 | Написати `docker-compose.test.yml` для ізольованих тестів у CI | `docker-compose.test.yml` | M | T-014 | — |
-| T-487 | 🔲 | Верифікувати: CI проходить на Python 3.11 та 3.12 | `.github/workflows/ci.yml` | S | T-479 | — |
-| T-488 | 🔲 | Верифікувати: docker build < 5 хвилин у CI | `.github/workflows/ci.yml` | S | T-481 | — |
-| T-489 | 🔲 | Запустити повний CI pipeline → зелений | CI | S | T-487, T-488 | — |
-| T-490 | 🔲 | Документувати CI/CD процес у docs/DEPLOYMENT_GUIDE | `docs/DEPLOYMENT_GUIDE_HETZNER_LOCAL_FIRST.md` | S | T-483 | — |
+| T-479 | ✅ | Додати `ruff` linter до pyproject.toml та CI | `pyproject.toml`, `.github/workflows/ci.yml` | S | T-013 | 2026-07-21 |
+| T-480 | ✅ | Додати `bandit` security scanner до CI | `.github/workflows/ci.yml` | S | T-013 | 2026-07-21 |
+| T-481 | ✅ | Додати docker build перевірку до CI | `.github/workflows/ci.yml` | S | T-014 | 2026-07-21 |
+| T-482 | ✅ | Додати coverage badge до README.md | `README.md`, `.github/workflows/ci.yml` | S | T-013 | 2026-07-21 |
+| T-483 | ✅ | Написати `release.yml` workflow (tag v* → GHCR push) | `.github/workflows/release.yml` | L | T-013 | 2026-07-21 |
+| T-484 | ✅ | Налаштувати Dependabot для auto-update залежностей | `.github/dependabot.yml` | S | T-013 | 2026-07-21 |
+| T-485 | ✅ | Додати `pytest --cov` coverage звіт до PR коментарів | `.github/workflows/ci.yml` | M | T-013 | 2026-07-21 |
+| T-486 | ✅ | Написати `docker-compose.test.yml` для ізольованих тестів у CI | `docker-compose.test.yml` | M | T-014 | 2026-07-21 |
+| T-487 | ✅ | Верифікувати: CI проходить на Python 3.11 та 3.12 | `.github/workflows/ci.yml` | S | T-479 | 2026-07-21 |
+| T-488 | ✅ | Верифікувати: docker build < 5 хвилин у CI | `.github/workflows/ci.yml` | S | T-481 | 2026-07-21 |
+| T-489 | ✅ | Запустити повний CI pipeline → зелений | CI | S | T-487, T-488 | 2026-07-21 |
+| T-490 | ✅ | Документувати CI/CD процес у docs/CICD_PIPELINE_GUIDE.md | `docs/CICD_PIPELINE_GUIDE.md` | S | T-483 | 2026-07-21 |
 
 **Acceptance для PHASE 7 (загалом):**
 - [ ] `docker compose up -d` на чистому Ubuntu 22.04 → успішно
